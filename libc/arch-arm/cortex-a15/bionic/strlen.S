@@ -1,91 +1,145 @@
+/* Copyright (c) 2010-2011,2013 Linaro Limited
+   All rights reserved.
+
+   Redistribution and use in source and binary forms, with or without
+   modification, are permitted provided that the following conditions
+   are met:
+
+      * Redistributions of source code must retain the above copyright
+      notice, this list of conditions and the following disclaimer.
+
+      * Redistributions in binary form must reproduce the above copyright
+      notice, this list of conditions and the following disclaimer in the
+      documentation and/or other materials provided with the distribution.
+
+      * Neither the name of Linaro Limited nor the names of its
+      contributors may be used to endorse or promote products derived
+      from this software without specific prior written permission.
+
+   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
+   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
+   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
+   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
+   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
+   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
+   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
+   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
+   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
+   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
+   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ */
+
 /*
- * Copyright (c) 2011 Apple, Inc. All rights reserved.
- *
- * @APPLE_LICENSE_HEADER_START@
- *
- * This file contains Original Code and/or Modifications of Original Code
- * as defined in and that are subject to the Apple Public Source License
- * Version 2.0 (the 'License'). You may not use this file except in
- * compliance with the License. Please obtain a copy of the License at
- * http://www.opensource.apple.com/apsl/ and read it before using this
- * file.
- *
- * The Original Code and all software distributed under the License are
- * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
- * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
- * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
- * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
- * Please see the License for the specific language governing rights and
- * limitations under the License.
- *
- * @APPLE_LICENSE_HEADER_END@
+   Assumes:
+   ARMv6T2, AArch32
+
+   Adapted to Bionic by Bernhard Rosenkränzer <bero@linaro.org>
  */
 
 #include <private/bionic_asm.h>
 
-.syntax unified
-.code 32
+#ifdef __ARMEB__
+#define S2LO		lsl
+#define S2HI		lsr
+#else
+#define S2LO		lsr
+#define S2HI		lsl
+#endif
 
-#define addr r0
-#define word r1
-#define temp r2
-#define mask r3
-#define save ip
-#define indx r0
+    .text
+    .thumb
+    .syntax unified
 
-.macro IfWordDoesntContainNUL_SetZ
-//  In each word of the string, we check for NUL bytes via a saturating
-//  unsigned subtraction of each byte from 0x1.  The result of this is
-//  non-zero if and only if the corresponding byte in the string is NUL.
-//  Simply using a TST instruction checks all four bytes for NULs in one
-//  go.
-    uqsub8  temp,   mask,   word
-    tst     temp,           temp
-.endm
+/* Parameters and result.  */
+#define srcin		r0
+#define result		r0
 
-.text
-.align 4
-.long 0x0           // padding
-.long 0x01010101    // mask for use in finding NULs
+/* Internal variables.  */
+#define src		r1
+#define data1a		r2
+#define data1b		r3
+#define const_m1	r12
+#define const_0		r4
+#define tmp1		r4		/* Overlaps const_0  */
+#define tmp2		r5
+
 ENTRY(strlen)
-//  Establish stack frame, load mask that we will use to find NUL bytes,
-//  and set aside a copy of the pointer to the string.
-    push    {r7,lr}
-    mov     r7,     sp
-    ldr     mask,   (strlen-4)
-    add		save,   addr,   #4
+    .p2align 6
+    pld     [srcin, #0]
+    strd    r4, r5, [sp, #-8]!
+    bic     src, srcin, #7
+    mvn     const_m1, #0
+    ands    tmp1, srcin, #7		/* (8 - bytes) to alignment.  */
+    pld     [src, #32]
+    bne.w   .L_misaligned8
+    mov     const_0, #0
+    mov     result, #-8
+.L_loop_aligned:
+	/* Bytes 0-7.  */
+    ldrd    data1a, data1b, [src]
+    pld     [src, #64]
+    add     result, result, #8
+.L_start_realigned:
+    uadd8   data1a, data1a, const_m1	/* Saturating GE<0:3> set.  */
+    sel     data1a, const_0, const_m1	/* Select based on GE<0:3>.  */
+    uadd8   data1b, data1b, const_m1
+    sel     data1b, data1a, const_m1	/* Only used if d1a == 0.  */
+    cbnz    data1b, .L_null_found
 
-//  Load the aligned word that contains the start of the string, then OR
-//  0x01 into any bytes that preceed the start of the string to prevent
-//  false positives when we check for NUL bytes.
-    and     temp,   addr,   #3
-    bic     addr,   addr,   #3
-    lsl     temp,   temp,   #3
-    ldr     word,  [addr],  #4
-    rsb     temp,   temp,   #32
-    orr     word,   word,   mask, lsr temp
+	/* Bytes 8-15.  */
+    ldrd    data1a, data1b, [src, #8]
+    uadd8   data1a, data1a, const_m1	/* Saturating GE<0:3> set.  */
+    add     result, result, #8
+    sel     data1a, const_0, const_m1	/* Select based on GE<0:3>.  */
+    uadd8   data1b, data1b, const_m1
+    sel     data1b, data1a, const_m1	/* Only used if d1a == 0.  */
+    cbnz    data1b, .L_null_found
 
-//  Check if the string ends in the first word.  If so, don't load any
-//  more of the string; instead jump directly to the cleanup code.
-    IfWordDoesntContainNUL_SetZ
-    bne     1f
+	/* Bytes 16-23.  */
+    ldrd    data1a, data1b, [src, #16]
+    uadd8   data1a, data1a, const_m1	/* Saturating GE<0:3> set.  */
+    add     result, result, #8
+    sel     data1a, const_0, const_m1	/* Select based on GE<0:3>.  */
+    uadd8   data1b, data1b, const_m1
+    sel     data1b, data1a, const_m1	/* Only used if d1a == 0.  */
+    cbnz    data1b, .L_null_found
 
-.align 4
-//  Load one word of the string on each iteration, and check it for NUL
-//  bytes.  If a NUL is found, fall through into the cleanup code.
-0:  ldr     word,  [addr],  #4
-    IfWordDoesntContainNUL_SetZ
-    beq		0b
+	/* Bytes 24-31.  */
+    ldrd    data1a, data1b, [src, #24]
+    add     src, src, #32
+    uadd8   data1a, data1a, const_m1	/* Saturating GE<0:3> set.  */
+    add     result, result, #8
+    sel     data1a, const_0, const_m1	/* Select based on GE<0:3>.  */
+    uadd8   data1b, data1b, const_m1
+    sel     data1b, data1a, const_m1	/* Only used if d1a == 0.  */
+    cmp     data1b, #0
+    beq     .L_loop_aligned
 
-//  The last word that we loaded contained a NUL.  Subtracting the saved
-//  pointer from the current pointer gives us the number of bytes from
-//  the start of the string to the word containing the NUL.
-1:  sub     indx,   addr,   save
-//  To that we add the index of the first NUL byte in the word, computed
-//  using REV and CLZ followed by a shift.
-    rev     temp,           temp
-    clz     temp,           temp
-    add     indx,   indx,   temp, lsr #3
-    pop     {r7,pc}
+.L_null_found:
+    cmp     data1a, #0
+    itt     eq
+    addeq   result, result, #4
+    moveq   data1a, data1b
+#ifndef __ARMEB__
+    rev     data1a, data1a
+#endif
+    clz     data1a, data1a
+    ldrd    r4, r5, [sp], #8
+    add     result, result, data1a, lsr #3	/* Bits -> Bytes.  */
+    bx      lr
 
+.L_misaligned8:
+    ldrd    data1a, data1b, [src]
+    and     tmp2, tmp1, #3
+    rsb     result, tmp1, #0
+    lsl     tmp2, tmp2, #3			/* Bytes -> bits.  */
+    tst     tmp1, #4
+    pld     [src, #64]
+    S2HI    tmp2, const_m1, tmp2
+    orn     data1a, data1a, tmp2
+    itt     ne
+    ornne   data1b, data1b, tmp2
+    movne   data1a, const_m1
+    mov     const_0, #0
+    b       .L_start_realigned
 END(strlen)
