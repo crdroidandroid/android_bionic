@@ -184,6 +184,7 @@ L(copy_long):
 	ldp	B_l, B_h, [src, 32]
 	ldp	C_l, C_h, [src, 48]
 	ldp	D_l, D_h, [src, 64]!
+       prfm    pldl1strm, [src, #(4*64)]
 	subs	count, count, 128 + 16	/* Test and readjust count.  */
 	b.ls	2f
 1:
