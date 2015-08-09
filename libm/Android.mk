@@ -16,6 +16,8 @@ libm_common_src_files += \
     upstream-freebsd/lib/msun/bsdsrc/b_exp.c \
     upstream-freebsd/lib/msun/bsdsrc/b_log.c \
     upstream-freebsd/lib/msun/bsdsrc/b_tgamma.c \
+    upstream-freebsd/lib/msun/src/catrig.c \
+    upstream-freebsd/lib/msun/src/catrigf.c \
     upstream-freebsd/lib/msun/src/e_acos.c \
     upstream-freebsd/lib/msun/src/e_acosf.c \
     upstream-freebsd/lib/msun/src/e_acosh.c \
@@ -80,29 +82,33 @@ libm_common_src_files += \
     upstream-freebsd/lib/msun/src/s_atanf.c \
     upstream-freebsd/lib/msun/src/s_carg.c \
     upstream-freebsd/lib/msun/src/s_cargf.c \
+    upstream-freebsd/lib/msun/src/s_cargl.c \
     upstream-freebsd/lib/msun/src/s_cbrt.c \
     upstream-freebsd/lib/msun/src/s_cbrtf.c \
     upstream-freebsd/lib/msun/src/s_ccosh.c \
     upstream-freebsd/lib/msun/src/s_ccoshf.c \
-    upstream-freebsd/lib/msun/src/s_ceil.c \
-    upstream-freebsd/lib/msun/src/s_ceilf.c \
     upstream-freebsd/lib/msun/src/s_cexp.c \
     upstream-freebsd/lib/msun/src/s_cexpf.c \
     upstream-freebsd/lib/msun/src/s_cimag.c \
     upstream-freebsd/lib/msun/src/s_cimagf.c \
+    upstream-freebsd/lib/msun/src/s_cimagl.c \
     upstream-freebsd/lib/msun/src/s_conj.c \
     upstream-freebsd/lib/msun/src/s_conjf.c \
+    upstream-freebsd/lib/msun/src/s_conjl.c \
     upstream-freebsd/lib/msun/src/s_copysign.c \
     upstream-freebsd/lib/msun/src/s_copysignf.c \
     upstream-freebsd/lib/msun/src/s_cosf.c \
     upstream-freebsd/lib/msun/src/s_cproj.c \
     upstream-freebsd/lib/msun/src/s_cprojf.c \
+    upstream-freebsd/lib/msun/src/s_cprojl.c \
     upstream-freebsd/lib/msun/src/s_creal.c \
     upstream-freebsd/lib/msun/src/s_crealf.c \
+    upstream-freebsd/lib/msun/src/s_creall.c \
     upstream-freebsd/lib/msun/src/s_csinh.c \
     upstream-freebsd/lib/msun/src/s_csinhf.c \
     upstream-freebsd/lib/msun/src/s_csqrt.c \
     upstream-freebsd/lib/msun/src/s_csqrtf.c \
+    upstream-freebsd/lib/msun/src/s_csqrtl.c \
     upstream-freebsd/lib/msun/src/s_ctanh.c \
     upstream-freebsd/lib/msun/src/s_ctanhf.c \
     upstream-freebsd/lib/msun/src/s_erf.c \
@@ -116,10 +122,6 @@ libm_common_src_files += \
     upstream-freebsd/lib/msun/src/s_fdim.c \
     upstream-freebsd/lib/msun/src/s_finite.c \
     upstream-freebsd/lib/msun/src/s_finitef.c \
-    upstream-freebsd/lib/msun/src/s_floor.c \
-    upstream-freebsd/lib/msun/src/s_floorf.c \
-    upstream-freebsd/lib/msun/src/s_fma.c \
-    upstream-freebsd/lib/msun/src/s_fmaf.c \
     upstream-freebsd/lib/msun/src/s_fmax.c \
     upstream-freebsd/lib/msun/src/s_fmaxf.c \
     upstream-freebsd/lib/msun/src/s_fmin.c \
@@ -128,16 +130,12 @@ libm_common_src_files += \
     upstream-freebsd/lib/msun/src/s_frexpf.c \
     upstream-freebsd/lib/msun/src/s_ilogb.c \
     upstream-freebsd/lib/msun/src/s_ilogbf.c \
-    upstream-freebsd/lib/msun/src/s_llrint.c \
-    upstream-freebsd/lib/msun/src/s_llrintf.c \
     upstream-freebsd/lib/msun/src/s_llround.c \
     upstream-freebsd/lib/msun/src/s_llroundf.c \
     upstream-freebsd/lib/msun/src/s_log1p.c \
     upstream-freebsd/lib/msun/src/s_log1pf.c \
     upstream-freebsd/lib/msun/src/s_logb.c \
     upstream-freebsd/lib/msun/src/s_logbf.c \
-    upstream-freebsd/lib/msun/src/s_lrint.c \
-    upstream-freebsd/lib/msun/src/s_lrintf.c \
     upstream-freebsd/lib/msun/src/s_lround.c \
     upstream-freebsd/lib/msun/src/s_lroundf.c \
     upstream-freebsd/lib/msun/src/s_modf.c \
@@ -148,8 +146,6 @@ libm_common_src_files += \
     upstream-freebsd/lib/msun/src/s_nextafterf.c \
     upstream-freebsd/lib/msun/src/s_remquo.c \
     upstream-freebsd/lib/msun/src/s_remquof.c \
-    upstream-freebsd/lib/msun/src/s_rint.c \
-    upstream-freebsd/lib/msun/src/s_rintf.c \
     upstream-freebsd/lib/msun/src/s_round.c \
     upstream-freebsd/lib/msun/src/s_roundf.c \
     upstream-freebsd/lib/msun/src/s_scalbln.c \
@@ -164,10 +160,9 @@ libm_common_src_files += \
     upstream-freebsd/lib/msun/src/s_tanh.c \
     upstream-freebsd/lib/msun/src/s_tanhf.c \
     upstream-freebsd/lib/msun/src/s_tgammaf.c \
-    upstream-freebsd/lib/msun/src/s_trunc.c \
-    upstream-freebsd/lib/msun/src/s_truncf.c \
     upstream-freebsd/lib/msun/src/w_cabs.c \
     upstream-freebsd/lib/msun/src/w_cabsf.c \
+    upstream-freebsd/lib/msun/src/w_cabsl.c \
     upstream-freebsd/lib/msun/src/w_drem.c \
     upstream-freebsd/lib/msun/src/w_dremf.c
 
@@ -175,7 +170,7 @@ libm_common_src_files += \
     fake_long_double.c \
     signbit.c \
 
-libm_ld_src_files = \
+libm_ld128_src_files = \
     upstream-freebsd/lib/msun/src/e_acosl.c \
     upstream-freebsd/lib/msun/src/e_acoshl.c \
     upstream-freebsd/lib/msun/src/e_asinl.c \
@@ -190,6 +185,7 @@ libm_ld_src_files = \
     upstream-freebsd/lib/msun/src/s_cbrtl.c \
     upstream-freebsd/lib/msun/src/s_ceill.c \
     upstream-freebsd/lib/msun/src/s_copysignl.c \
+    upstream-freebsd/lib/msun/src/e_coshl.c \
     upstream-freebsd/lib/msun/src/s_cosl.c \
     upstream-freebsd/lib/msun/src/s_fabsl.c \
     upstream-freebsd/lib/msun/src/s_floorl.c \
@@ -211,25 +207,163 @@ libm_ld_src_files = \
     upstream-freebsd/lib/msun/src/s_rintl.c \
     upstream-freebsd/lib/msun/src/s_roundl.c \
     upstream-freebsd/lib/msun/src/s_scalbnl.c \
+    upstream-freebsd/lib/msun/src/e_sinhl.c \
     upstream-freebsd/lib/msun/src/s_sinl.c \
+    upstream-freebsd/lib/msun/src/s_tanhl.c \
     upstream-freebsd/lib/msun/src/s_tanl.c \
     upstream-freebsd/lib/msun/src/s_truncl.c \
 
-libm_ld_src_files += \
+libm_ld128_src_files += \
     upstream-freebsd/lib/msun/ld128/invtrig.c \
     upstream-freebsd/lib/msun/ld128/k_cosl.c \
     upstream-freebsd/lib/msun/ld128/k_sinl.c \
     upstream-freebsd/lib/msun/ld128/k_tanl.c \
+    upstream-freebsd/lib/msun/ld128/s_erfl.c \
     upstream-freebsd/lib/msun/ld128/s_exp2l.c \
     upstream-freebsd/lib/msun/ld128/s_expl.c \
     upstream-freebsd/lib/msun/ld128/s_logl.c \
     upstream-freebsd/lib/msun/ld128/s_nanl.c \
+
+# Arch specific optimizations.
+
+# -----------------------------------------------------------------------------
+# arm
+# -----------------------------------------------------------------------------
+libm_arm_arch_files += \
+    upstream-freebsd/lib/msun/src/s_ceil.c \
+    upstream-freebsd/lib/msun/src/s_ceilf.c \
+    upstream-freebsd/lib/msun/src/s_fma.c \
+    upstream-freebsd/lib/msun/src/s_fmaf.c \
+    upstream-freebsd/lib/msun/src/s_floorf.c \
+    upstream-freebsd/lib/msun/src/s_llrint.c \
+    upstream-freebsd/lib/msun/src/s_llrintf.c \
+    upstream-freebsd/lib/msun/src/s_lrint.c \
+    upstream-freebsd/lib/msun/src/s_lrintf.c \
+    upstream-freebsd/lib/msun/src/s_rint.c \
+    upstream-freebsd/lib/msun/src/s_rintf.c \
+    upstream-freebsd/lib/msun/src/s_trunc.c \
+    upstream-freebsd/lib/msun/src/s_truncf.c \
+
+# s_floor.S requires neon instructions.
+ifdef TARGET_2ND_ARCH
+arch_variant := $(TARGET_2ND_ARCH_VARIANT)
+else
+arch_variant := $(TARGET_ARCH_VARIANT)
+endif
+
+# Use the C version on armv7-a since it doesn't support neon instructions.
+ifeq ($(arch_variant),armv7-a)
+libm_arm_arch_files += \
+    upstream-freebsd/lib/msun/src/s_cos.c \
+    upstream-freebsd/lib/msun/src/s_sin.c \
+    upstream-freebsd/lib/msun/src/e_sqrt.c \
+    upstream-freebsd/lib/msun/src/e_sqrtf.c \
+    upstream-freebsd/lib/msun/src/s_floor.c \
+
+else
+libm_arm_arch_files += \
+    arm/s_cos.S \
+    arm/s_sin.S \
+    arm/e_sqrt.S \
+    arm/e_sqrtf.S \
+    arm/s_floor.S \
+
+libm_arm_arch_cflags += -DQCOM_NEON_OPTIMIZATION -fno-if-conversion
+endif
+
+# -----------------------------------------------------------------------------
+# arm64
+# -----------------------------------------------------------------------------
+libm_arm64_arch_files += \
+    upstream-freebsd/lib/msun/src/s_cos.c \
+    upstream-freebsd/lib/msun/src/s_sin.c \
+    arm64/ceil.S \
+    arm64/fma.S \
+    arm64/floor.S \
+    arm64/lrint.S \
+    arm64/rint.S \
+    arm64/sqrt.S \
+    arm64/trunc.S \
+
+libm_arm64_arch_cflags += -DQCOM_NEON_OPTIMIZATION
+
+# -----------------------------------------------------------------------------
+# mips
+# -----------------------------------------------------------------------------
+libm_mips_arch_files += \
+    mips/fenv.c \
+    upstream-freebsd/lib/msun/src/e_sqrt.c \
+    upstream-freebsd/lib/msun/src/e_sqrtf.c \
+    upstream-freebsd/lib/msun/src/s_ceil.c \
+    upstream-freebsd/lib/msun/src/s_ceilf.c \
+    upstream-freebsd/lib/msun/src/s_cos.c \
+    upstream-freebsd/lib/msun/src/s_fma.c \
+    upstream-freebsd/lib/msun/src/s_fmaf.c \
+    upstream-freebsd/lib/msun/src/s_floor.c \
+    upstream-freebsd/lib/msun/src/s_floorf.c \
+    upstream-freebsd/lib/msun/src/s_llrint.c \
+    upstream-freebsd/lib/msun/src/s_llrintf.c \
+    upstream-freebsd/lib/msun/src/s_lrint.c \
+    upstream-freebsd/lib/msun/src/s_lrintf.c \
+    upstream-freebsd/lib/msun/src/s_rint.c \
+    upstream-freebsd/lib/msun/src/s_rintf.c \
+    upstream-freebsd/lib/msun/src/s_sin.c \
+    upstream-freebsd/lib/msun/src/s_trunc.c \
+    upstream-freebsd/lib/msun/src/s_truncf.c \
+
+
+# -----------------------------------------------------------------------------
+# x86
+# -----------------------------------------------------------------------------
+libm_x86_arch_files += \
+    upstream-freebsd/lib/msun/src/e_sqrt.c \
+    upstream-freebsd/lib/msun/src/e_sqrtf.c \
+    upstream-freebsd/lib/msun/src/s_ceil.c \
+    upstream-freebsd/lib/msun/src/s_ceilf.c \
+    upstream-freebsd/lib/msun/src/s_cos.c \
+    upstream-freebsd/lib/msun/src/s_fma.c \
+    upstream-freebsd/lib/msun/src/s_fmaf.c \
+    upstream-freebsd/lib/msun/src/s_floor.c \
+    upstream-freebsd/lib/msun/src/s_floorf.c \
+    upstream-freebsd/lib/msun/src/s_llrint.c \
+    upstream-freebsd/lib/msun/src/s_llrintf.c \
+    upstream-freebsd/lib/msun/src/s_lrint.c \
+    upstream-freebsd/lib/msun/src/s_lrintf.c \
+    upstream-freebsd/lib/msun/src/s_rint.c \
+    upstream-freebsd/lib/msun/src/s_rintf.c \
+    upstream-freebsd/lib/msun/src/s_sin.c \
+    upstream-freebsd/lib/msun/src/s_trunc.c \
+    upstream-freebsd/lib/msun/src/s_truncf.c \
+
+# -----------------------------------------------------------------------------
+# x86_64
+# -----------------------------------------------------------------------------
+libm_x86_64_arch_files += \
+    upstream-freebsd/lib/msun/src/e_sqrt.c \
+    upstream-freebsd/lib/msun/src/e_sqrtf.c \
+    upstream-freebsd/lib/msun/src/s_ceil.c \
+    upstream-freebsd/lib/msun/src/s_ceilf.c \
+    upstream-freebsd/lib/msun/src/s_cos.c \
+    upstream-freebsd/lib/msun/src/s_fma.c \
+    upstream-freebsd/lib/msun/src/s_fmaf.c \
+    upstream-freebsd/lib/msun/src/s_floor.c \
+    upstream-freebsd/lib/msun/src/s_floorf.c \
+    upstream-freebsd/lib/msun/src/s_llrint.c \
+    upstream-freebsd/lib/msun/src/s_llrintf.c \
+    upstream-freebsd/lib/msun/src/s_lrint.c \
+    upstream-freebsd/lib/msun/src/s_lrintf.c \
+    upstream-freebsd/lib/msun/src/s_rint.c \
+    upstream-freebsd/lib/msun/src/s_rintf.c \
+    upstream-freebsd/lib/msun/src/s_sin.c \
+    upstream-freebsd/lib/msun/src/s_trunc.c \
+    upstream-freebsd/lib/msun/src/s_truncf.c \
 
 # TODO: re-enable i387/e_sqrtf.S for x86, and maybe others.
 
 libm_common_cflags := \
     -DFLT_EVAL_METHOD=0 \
     -std=c99 \
+    -O3 \
     -include $(LOCAL_PATH)/freebsd-compat.h \
     -Wno-missing-braces \
     -Wno-parentheses \
@@ -242,36 +376,9 @@ libm_common_cflags := \
 # self recursions for lrint, lrintf, and lrintl.
 # BUG: 14225968
 libm_common_cflags += -fno-builtin-rint -fno-builtin-rintf -fno-builtin-rintl
-libm_common_includes := $(LOCAL_PATH)/upstream-freebsd/lib/msun/src/
+libm_common_includes += $(LOCAL_PATH)/upstream-freebsd/lib/msun/src/
 
-libm_ld_includes := $(LOCAL_PATH)/upstream-freebsd/lib/msun/ld128/
-
-ifeq ($(TARGET_USE_QCOM_BIONIC_OPTIMIZATION),true)
-  libm_arm_src_files += \
-    arm/e_pow.S \
-    arm/s_cos.S \
-    arm/s_sin.S \
-    arm/e_sqrtf.S \
-    arm/e_sqrt.S
-  libm_arm_cflags += -DQCOM_NEON_OPTIMIZATION -fno-if-conversion
-  libm_arm_includes += $(LOCAL_PATH)/../libc/
-
-  libm_arm64_src_files += \
-    arm64/e_pow64.S \
-    upstream-freebsd/lib/msun/src/s_cos.c \
-    upstream-freebsd/lib/msun/src/s_sin.c \
-    upstream-freebsd/lib/msun/src/e_sqrtf.c \
-    upstream-freebsd/lib/msun/src/e_sqrt.c
-
-  libm_arm64_cflags += -DQCOM_NEON_OPTIMIZATION
-  libm_arm64_includes += $(LOCAL_PATH)/../libc/
-else
-  libm_common_src_files += \
-    upstream-freebsd/lib/msun/src/s_cos.c \
-    upstream-freebsd/lib/msun/src/s_sin.c \
-    upstream-freebsd/lib/msun/src/e_sqrtf.c \
-    upstream-freebsd/lib/msun/src/e_sqrt.c
-endif
+libm_ld_includes += $(LOCAL_PATH)/upstream-freebsd/lib/msun/ld128/
 
 #
 # libm.a for target.
@@ -285,25 +392,29 @@ LOCAL_C_INCLUDES += $(libm_common_includes)
 LOCAL_SRC_FILES := $(libm_common_src_files)
 LOCAL_SYSTEM_SHARED_LIBRARIES := libc
 
-# arch-specific settings
-LOCAL_CFLAGS_arm := $(libm_arm_cflags)
-LOCAL_C_INCLUDES_arm := $(LOCAL_PATH)/arm $(libm_arm_includes)
-LOCAL_SRC_FILES_arm := arm/fenv.c $(libm_arm_src_files)
+LOCAL_ASFLAGS := \
+    -Ibionic/libc \
 
-LOCAL_CFLAGS_arm64 := $(libm_arm64_cflags)
-LOCAL_C_INCLUDES_arm64 := $(libm_ld_includes) $(libm_arm64_includes)
-LOCAL_SRC_FILES_arm64 := arm64/fenv.c $(libm_ld_src_files) $(libm_arm64_src_files)
+# arch-specific settings
+LOCAL_CFLAGS_arm := $(libm_arm_arch_cflags)
+LOCAL_C_INCLUDES_arm := $(LOCAL_PATH)/arm $(libm_arm_arch_includes)
+LOCAL_SRC_FILES_arm := arm/fenv.c $(libm_arm_arch_files)
+
+LOCAL_CFLAGS_arm64 := $(libm_arm64_arch_cflags)
+LOCAL_C_INCLUDES_arm64 := $(libm_ld_includes) $(libm_arm64_arch_includes)
+LOCAL_SRC_FILES_arm64 := arm64/fenv.c $(libm_ld128_src_files) $(libm_arm64_arch_files)
 
 LOCAL_C_INCLUDES_x86 := $(LOCAL_PATH)/i387
-LOCAL_SRC_FILES_x86 := i387/fenv.c
+LOCAL_SRC_FILES_x86 := i387/fenv.c $(libm_x86_arch_files)
 
 LOCAL_C_INCLUDES_x86_64 := $(libm_ld_includes)
-LOCAL_SRC_FILES_x86_64 := amd64/fenv.c $(libm_ld_src_files)
+LOCAL_SRC_FILES_x86_64 := amd64/fenv.c $(libm_ld128_src_files) $(libm_x86_64_arch_files)
 
-LOCAL_SRC_FILES_mips := mips/fenv.c
+LOCAL_SRC_FILES_mips += mips/fenv.c $(libm_mips_arch_files)
 
 LOCAL_C_INCLUDES_mips64 := $(libm_ld_includes)
-LOCAL_SRC_FILES_mips64 := mips/fenv.c $(libm_ld_src_files)
+LOCAL_SRC_FILES_mips64 := mips/fenv.c $(libm_ld128_src_files)
+LOCAL_SRC_FILES_mips64 += $(libm_mips_arch_files)
 
 include $(BUILD_STATIC_LIBRARY)
 
