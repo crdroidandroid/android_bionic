@@ -53,11 +53,7 @@
  * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
  */
 
-ENTRY_PRIVATE(MEMCPY_BASE)
-        .cfi_def_cfa_offset 8
-        .cfi_rel_offset r0, 0
-        .cfi_rel_offset lr, 4
-
+.L_memcpy_base:
         // Assumes that n >= 0, and dst, src are valid pointers.
         cmp     r2, #16
         blo     .L_copy_less_than_16_unknown_align
@@ -145,4 +141,3 @@ ENTRY_PRIVATE(MEMCPY_BASE)
         strbcs      lr, [r0]
 
         pop         {r0, pc}
-END(MEMCPY_BASE)
