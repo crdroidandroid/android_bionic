@@ -1219,9 +1219,6 @@ retry:
 		 * XXX - potential security hazard could
 		 *	 be detected here.
 		 */
-#ifdef ANDROID_CHANGES
-		__libc_android_log_event_uid(BIONIC_EVENT_RESOLVER_OLD_RESPONSE);
-#endif
 		DprintQ((statp->options & RES_DEBUG) ||
 			(statp->pfcode & RES_PRF_REPLY),
 			(stdout, ";; old answer:\n"),
@@ -1235,9 +1232,6 @@ retry:
 		 * XXX - potential security hazard could
 		 *	 be detected here.
 		 */
-#ifdef ANDROID_CHANGES
-		__libc_android_log_event_uid(BIONIC_EVENT_RESOLVER_WRONG_SERVER);
-#endif
 		DprintQ((statp->options & RES_DEBUG) ||
 			(statp->pfcode & RES_PRF_REPLY),
 			(stdout, ";; not our server:\n"),
@@ -1268,9 +1262,6 @@ retry:
 		 * XXX - potential security hazard could
 		 *	 be detected here.
 		 */
-#ifdef ANDROID_CHANGES
-		__libc_android_log_event_uid(BIONIC_EVENT_RESOLVER_WRONG_QUERY);
-#endif
 		DprintQ((statp->options & RES_DEBUG) ||
 			(statp->pfcode & RES_PRF_REPLY),
 			(stdout, ";; wrong query name:\n"),
