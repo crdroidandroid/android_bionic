@@ -271,6 +271,29 @@ LIBC {
     *;
 };
 
+LIBC_O {
+  global:
+    cacoshl;
+    cacosl;
+    casinhl;
+    casinl;
+    catanhl;
+    catanl;
+    ccoshl;
+    ccosl;
+    cexpl;
+    clog;
+    clogf;
+    clogl;
+    cpow;
+    cpowf;
+    cpowl;
+    csinhl;
+    csinl;
+    ctanhl;
+    ctanl;
+} LIBC;
+
 LIBC_PRIVATE { # arm mips
   global: # arm mips
     ___Unwind_Backtrace; # arm
