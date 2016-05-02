@@ -119,6 +119,8 @@ LIBC {
     __pread_chk; # introduced=23
     __progname; # var
     __pselect6; # arm x86 mips introduced=21
+    __propClientDispatch; #arm arm64 nobrillo
+    __propClientDispatchWrite; #arm arm64 nobrillo
     __pthread_cleanup_pop;
     __pthread_cleanup_push;
     __ptrace; # arm x86 mips

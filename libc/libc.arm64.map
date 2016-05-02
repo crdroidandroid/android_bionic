@@ -77,6 +77,8 @@ LIBC {
     __pread64_chk; # introduced=23
     __pread_chk; # introduced=23
     __progname; # var
+    __propClientDispatch; #arm arm64 nobrillo
+    __propClientDispatchWrite; #arm arm64 nobrillo
     __pthread_cleanup_pop;
     __pthread_cleanup_push;
     __putlong;
