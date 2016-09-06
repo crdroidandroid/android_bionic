@@ -73,7 +73,7 @@ bool DebugData::Initialize(const char* options) {
     }
 
     if (config_.options & TRACK_ALLOCS) {
-      track.reset(new TrackData(this));
+      track.reset(new TrackData());
     }
   }
 

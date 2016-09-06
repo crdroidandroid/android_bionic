@@ -197,12 +197,13 @@ bool debug_initialize(const MallocDispatch* malloc_dispatch, int* malloc_zygote_
   }
 
   DebugData* debug = new DebugData();
+  g_debug = debug;
   if (!debug->Initialize(options)) {
     delete debug;
+    g_debug = nullptr;
     DebugDisableFinalize();
     return false;
   }
-  g_debug = debug;
 
   // Always enable the backtrace code since we will use it in a number
   // of different error cases.
@@ -221,7 +222,7 @@ void debug_finalize() {
   }
 
   if (g_debug->config().options & LEAK_TRACK) {
-    g_debug->track->DisplayLeaks();
+    //g_debug->track->DisplayLeaks();  // We don't need this anymore.
   }
 
   DebugDisableSet(true);

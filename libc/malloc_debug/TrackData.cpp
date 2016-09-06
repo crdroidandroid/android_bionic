@@ -138,3 +138,162 @@ void TrackData::GetInfo(uint8_t** info, size_t* overall_size, size_t* info_size,
     }
   }
 }
+
+// Leak Patch Begin
+#include <errno.h>
+#include <signal.h>
+#include <sys/types.h>
+#include <unistd.h>
+
+#define DEBUG_SIGNAL        SIGWINCH
+#define DEBUG_MAX_STACK     (30)
+extern DebugData* g_debug;
+
+struct LeakHeader {
+  size_t size;
+  size_t count;
+  BacktraceHeader* back_header;
+} __attribute__((packed));
+
+LeakHeader* SearchLeakHeader(LeakHeader* list, BacktraceHeader* back_header, int records) {
+  LeakHeader* leakHeader = list;
+
+  //error_log("SearchLeakHeader list = %p, back_header = %p", list, back_header);
+  //error_log("SearchLeakHeader num_frames = %zu, record = %d", back_header->num_frames, records);
+
+  for (int i = 0; i < records; i++) {
+    //error_log("SearchLeakHeader leakHeader = %p, back_header = %p, i = %d", leakHeader, leakHeader->back_header, i);
+    //error_log("SearchLeakHeader num_frames = %zu", leakHeader->back_header->num_frames);
+
+    if ((leakHeader->back_header->num_frames == back_header->num_frames) &&
+        (!memcmp(leakHeader->back_header->frames, back_header->frames, back_header->num_frames * sizeof(uintptr_t)))) {
+      // error_log("SearchLeakHeader leakHeader = %p", leakHeader);
+      return leakHeader;
+    }
+    leakHeader ++;
+  }
+
+  return nullptr;
+}
+
+int CompareHeader( const void *a ,const void *b) {
+  return (*(LeakHeader *)a).size > (*(LeakHeader *)b).size ? -1 : 1;
+}
+
+void TrackData::DumpLeaks(DebugData& debug) {
+  ScopedDisableDebugCalls disable;
+
+  if (headers_.size() == 0 || total_backtrace_allocs_ == 0) {
+    return;
+  }
+
+  if (!(debug.config().options & BACKTRACE)) {
+    return;
+  }
+
+  pthread_mutex_lock(&mutex_);
+
+  int records = 0;
+  int top = 0;
+  size_t total_size = 0;
+  BacktraceHeader* back_header;
+  LeakHeader* list = static_cast<LeakHeader*>(g_dispatch->calloc(total_backtrace_allocs_, sizeof(LeakHeader)));
+  LeakHeader* leakHeader = list;
+  LeakHeader* findHeader = nullptr;
+
+  error_log("+++ %s leaked memory dumping started +++", getprogname());
+  //error_log("DumpLeaks list = %p, total_backtrace_allocs_ = %zu", list, total_backtrace_allocs_);
+
+  for (const auto& header : headers_) {
+    back_header = debug.GetAllocBacktrace(header);
+    if(back_header->num_frames == 0) {
+      continue;
+	}
+
+    findHeader = SearchLeakHeader(list, back_header, records);
+
+    // error_log("findHeader = %p", findHeader);
+
+    total_size += header->real_size();
+    if (findHeader != nullptr) {
+      findHeader->size += header->real_size();
+      findHeader->count ++;
+    } else {
+       records ++;
+       leakHeader->size = header->real_size();
+       leakHeader->count = 1;
+       leakHeader->back_header = back_header;
+       leakHeader ++;
+    }
+  }
+
+  //error_log("+++ %s leaked memory sorting started +++", getprogname());
+  qsort(list, records, sizeof(LeakHeader), CompareHeader);
+  //error_log("+++ %s leaked memory sorting ended +++", getprogname());
+
+  leakHeader = list;
+
+  if (records > DEBUG_MAX_STACK) {
+    top = DEBUG_MAX_STACK;  // Only print DEBUG_MAX_STACK records.
+  } else {
+    top = records;
+  }
+
+  error_log("+++ total size: %d K, total records: %d, top records: %d +++", (int)(total_size / 1024), records, top);
+
+  for (int i = 0; i < top; i++) {
+      error_log("+++ Backtrace at time of allocation: total size %zu (leak times: %zu, avg size: %zu) +++",
+                 leakHeader->size, leakHeader->count, leakHeader->size / leakHeader->count);
+      //error_log("num_frames: %zu frames: %zu", leakHeader->back_header->num_frames, leakHeader->back_header->frames[0]);
+      backtrace_log(&leakHeader->back_header->frames[0], leakHeader->back_header->num_frames);
+      leakHeader ++;
+  }
+
+  error_log("+++ %s leaked memory dumping ended +++", getprogname());
+
+  g_dispatch->free(list);
+
+  pthread_mutex_unlock(&mutex_);
+}
+
+static void* PrintLeaks(void *arg) {
+  //g_debug->track->DisplayLeaks(*g_debug);
+
+  info_log("PrintLeaks::%s:%d backtrace printing. Thread = %s", getprogname(), getpid(), (char*)arg);
+
+  g_debug->track->DumpLeaks(*g_debug);
+
+  return nullptr;
+}
+
+static void PrintLeaksSignal(int, siginfo_t*, void*) {
+  if (!(g_debug->config().options & BACKTRACE) || !(g_debug->config().options & LEAK_TRACK)) {
+    error_log("PrintLeaksSignal::%s:%d backtrace hasn't been enabled.", getprogname(), getpid());
+    return;
+  }
+
+  int err;
+  pthread_t ntid;
+  pthread_attr_t attributes;
+  pthread_attr_init(&attributes);
+  err = pthread_create(&ntid, &attributes, PrintLeaks, (void*)"PrintLeaks Thread");
+  if (err != 0) {
+    error_log("PrintLeaksSignal::%s:%d can't create PrintLeaks thread.", getprogname(), getpid());
+  }
+}
+
+TrackData::TrackData() {
+  error_log(" SIGWINCH handler registration");
+  struct sigaction enable_act;
+  memset(&enable_act, 0, sizeof(enable_act));
+
+  enable_act.sa_sigaction = PrintLeaksSignal;
+  enable_act.sa_flags = SA_RESTART | SA_SIGINFO | SA_ONSTACK;
+  sigemptyset(&enable_act.sa_mask);
+  if (sigaction(DEBUG_SIGNAL, &enable_act, nullptr) != 0) {
+    error_log("Unable to set up memory leak signal function: %s", strerror(errno));
+    return;
+  }
+  info_log("%s: Run: 'kill -28 <pid of process>' to print memory leak information.", getprogname());
+}
+// Leack Patch End
