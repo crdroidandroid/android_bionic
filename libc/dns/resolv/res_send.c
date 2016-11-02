@@ -1094,6 +1094,7 @@ send_dg(res_state statp,
 	struct sockaddr_storage from;
 	socklen_t fromlen;
 	int resplen, seconds, n, s;
+	char abuf[NI_MAXHOST]; // IKSWN-8105 print out dns server and transaction id
 
 	nsap = get_nsaddr(statp, (size_t)ns);
 	nsaplen = get_salen(nsap);
@@ -1182,12 +1183,22 @@ retry:
 	n = retrying_select(s, &dsmask, NULL, &finish);
 
 	if (n == 0) {
+		// BEGIN MOTO IKSWN-8105 print out dns server and transaction id
+		getnameinfo(nsap, (socklen_t)nsaplen, abuf, sizeof(abuf),NULL, 0, niflags);
+		__libc_format_log(ANDROID_LOG_DEBUG, "libc",
+			"dns request timeout: netid(%d), id(0x%x), server(%s)\n", statp->netid, hp->id, abuf);
+		// END MOTO
 		*rcode = RCODE_TIMEOUT;
 		Dprint(statp->options & RES_DEBUG, (stdout, ";; timeout\n"));
 		*gotsomewhere = 1;
 		return (0);
 	}
 	if (n < 0) {
+		// BEGIN MOTO IKSWN-8105 print out dns server and transaction id
+		getnameinfo(nsap, (socklen_t)nsaplen, abuf, sizeof(abuf),NULL, 0, niflags);
+		__libc_format_log(ANDROID_LOG_DEBUG, "libc",
+			"Internal error: netid(%d), id(0x%x), server(%s)\n", statp->netid, hp->id, abuf);
+		// END MOTO
 		Perror(statp, stderr, "select", errno);
 		res_nclose(statp);
 		return (0);
