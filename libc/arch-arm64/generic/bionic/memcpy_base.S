@@ -99,6 +99,8 @@
 	add	dstend, dstin, count
         cmp     count, 16
         b.ls    L(copy16)
+        cmp count, 65536
+        b.ge L(copy_huge)
 	cmp	count, 96
 	b.hi	L(copy_long)
 
@@ -216,3 +218,50 @@ L(copy_long):
 	stp	B_l, B_h, [dstend, -32]
 	stp	C_l, C_h, [dstend, -16]
 	ret
+
+       .p2align 4
+L(copy_huge):
+       and     tmp1, dstin, 15
+       bic     dst, dstin, 15
+       ldp     D_l, D_h, [src]
+       sub     src, src, tmp1
+       add     count, count, tmp1      /* Count is now 16 too large.  */
+       ldp     A_l, A_h, [src, 16]
+       stp     D_l, D_h, [dstin]
+       ldp     B_l, B_h, [src, 32]
+       ldp     C_l, C_h, [src, 48]
+       ldp     D_l, D_h, [src, 64]!
+       subs    count, count, 128 + 16  /* Test and readjust count.  */
+       b.ls    2f
+1:
+       prfm pldl1keep, [src, #(64*48)]
+       stp     A_l, A_h, [dst, 16]
+       ldp     A_l, A_h, [src, 16]
+       stp     B_l, B_h, [dst, 32]
+       ldp     B_l, B_h, [src, 32]
+       stp     C_l, C_h, [dst, 48]
+       ldp     C_l, C_h, [src, 48]
+       stp     D_l, D_h, [dst, 64]!
+       ldp     D_l, D_h, [src, 64]!
+       subs    count, count, 64
+       b.hi    1b
+
+       /* Write the last full set of 64 bytes.  The remainder is at most 64
+          bytes, so it is safe to always copy 64 bytes from the end even if
+          there is just 1 byte left.  */
+2:
+       ldp     E_l, E_h, [srcend, -64]
+       stp     A_l, A_h, [dst, 16]
+       ldp     A_l, A_h, [srcend, -48]
+       stp     B_l, B_h, [dst, 32]
+       ldp     B_l, B_h, [srcend, -32]
+       stp     C_l, C_h, [dst, 48]
+       ldp     C_l, C_h, [srcend, -16]
+       stp     D_l, D_h, [dst, 64]
+       stp     E_l, E_h, [dstend, -64]
+       stp     A_l, A_h, [dstend, -48]
+       stp     B_l, B_h, [dstend, -32]
+       stp     C_l, C_h, [dstend, -16]
+
+       ret
+       .size   memcpy, . - memcpy
