@@ -108,10 +108,6 @@
 #include <stdarg.h>
 #include "nsswitch.h"
 
-#if defined(__BIONIC__)
-#include <sys/system_properties.h>
-#endif
-
 typedef union sockaddr_union {
     struct sockaddr     generic;
     struct sockaddr_in  in;
@@ -134,8 +130,10 @@ static const char in6_loopback[] = {
 };
 #endif
 
+#if defined(__ANDROID__)
 // This should be synchronized to ResponseCode.h
 static const int DnsProxyQueryResult = 222;
+#endif
 
 static const struct afd {
 	int a_af;
@@ -399,6 +397,7 @@ bool readBE32(FILE* fp, int32_t* result) {
   return true;
 }
 
+#if defined(__ANDROID__)
 // Returns 0 on success, else returns on error.
 static int
 android_getaddrinfo_proxy(
@@ -555,6 +554,7 @@ exit:
 	}
 	return EAI_NODATA;
 }
+#endif
 
 int
 getaddrinfo(const char *hostname, const char *servname,

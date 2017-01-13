@@ -68,6 +68,7 @@ cc_test_library {
         "grp_pwd_test.cpp",
         "ifaddrs_test.cpp",
         "inttypes_test.cpp",
+        "langinfo_test.cpp",
         "libc_logging_test.cpp",
         "libgen_basename_test.cpp",
         "libgen_test.cpp",
@@ -154,6 +155,8 @@ cc_test_library {
     shared: {
         enabled: false,
     },
+
+    generated_headers: ["generated_android_ids"],
 }
 
 // -----------------------------------------------------------------------------
@@ -272,7 +275,7 @@ cc_test_library {
 
 cc_test_library {
     name: "libBionicLoaderTests",
-    defaults: ["bionic_tests_defaults"],
+    defaults: ["bionic_tests_defaults", "llvm-defaults"],
     srcs: [
         "atexit_test.cpp",
         "dl_test.cpp",
@@ -297,6 +300,12 @@ cc_test_library {
             ],
             static_libs: [
                 "libpagemap",
+                "libLLVMObject",
+                "libLLVMBitReader",
+                "libLLVMMC",
+                "libLLVMMCParser",
+                "libLLVMCore",
+                "libLLVMSupport",
             ],
         }
     }
@@ -372,6 +381,12 @@ cc_defaults {
                 "libziparchive",
                 "libz",
                 "libutils",
+                "libLLVMObject",
+                "libLLVMBitReader",
+                "libLLVMMC",
+                "libLLVMMCParser",
+                "libLLVMCore",
+                "libLLVMSupport",
             ],
             ldflags: [
                 "-Wl,--rpath,${ORIGIN}/../bionic-loader-test-libs",
@@ -385,6 +400,12 @@ cc_test {
     name: "bionic-unit-tests",
     defaults: ["bionic_unit_tests_defaults", "bionic_tests_defaults"],
     clang: true,
+
+    target: {
+        android: {
+            shared_libs: ["libicuuc"],
+        },
+    },
 }
 
 cc_test {
@@ -403,6 +424,9 @@ cc_test {
     defaults: ["bionic_tests_defaults"],
     host_supported: false,
 
+    srcs: [
+        "gtest_preinit_debuggerd.cpp",
+    ],
     whole_static_libs: [
         "libBionicTests",
         "libBionicGtestMain",
@@ -416,6 +440,7 @@ cc_test {
         "libtinyxml2",
         "liblog",
         "libbase",
+        "libdebuggerd_client",
     ],
 
     static_executable: true,
@@ -476,7 +501,10 @@ cc_test_host {
 
     include_dirs: ["bionic/libc"],
 
-    ldflags: ["-Wl,--export-dynamic"],
+    ldflags: [
+        "-Wl,--rpath,${ORIGIN}/../bionic-loader-test-libs",
+        "-Wl,--export-dynamic",
+    ],
 
     sanitize: {
         never: false,

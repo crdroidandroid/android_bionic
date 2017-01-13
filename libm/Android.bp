@@ -5,6 +5,7 @@ bionic_coverage = false
 //
 cc_library {
     name: "libm",
+    defaults: ["linux_bionic_supported"],
 
     srcs: [
         "upstream-freebsd/lib/msun/bsdsrc/b_exp.c",
@@ -526,7 +527,8 @@ cc_library {
 
     native_coverage: bionic_coverage,
     sanitize: {
-        never: true,
+        address: false,
+        coverage: false,
     },
     stl: "none",
 }

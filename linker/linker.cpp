@@ -324,9 +324,7 @@ static bool realpath_fd(int fd, std::string* realpath) {
 // in that section (via *pcount).
 //
 // Intended to be called by libc's __gnu_Unwind_Find_exidx().
-//
-// This function is exposed via dlfcn.cpp and libdl.so.
-_Unwind_Ptr dl_unwind_find_exidx(_Unwind_Ptr pc, int* pcount) {
+_Unwind_Ptr do_dl_unwind_find_exidx(_Unwind_Ptr pc, int* pcount) {
   uintptr_t addr = reinterpret_cast<uintptr_t>(pc);
 
   for (soinfo* si = solist_get_head(); si != 0; si = si->next) {
@@ -1730,8 +1728,9 @@ static std::string android_dlextinfo_to_string(const android_dlextinfo* info) {
                                         info->library_namespace : nullptr);
 }
 
-void* do_dlopen(const char* name, int flags, const android_dlextinfo* extinfo,
-                  void* caller_addr) {
+void* do_dlopen(const char* name, int flags,
+                const android_dlextinfo* extinfo,
+                const void* caller_addr) {
   soinfo* const caller = find_containing_library(caller_addr);
   android_namespace_t* ns = get_caller_namespace(caller);
 
@@ -1785,18 +1784,21 @@ void* do_dlopen(const char* name, int flags, const android_dlextinfo* extinfo,
   std::string asan_name_holder;
 
   const char* translated_name = name;
-  if (g_is_asan) {
-    if (file_is_in_dir(name, kSystemLibDir)) {
-      asan_name_holder = std::string(kAsanSystemLibDir) + "/" + basename(name);
-      if (file_exists(asan_name_holder.c_str())) {
-        translated_name = asan_name_holder.c_str();
-        PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
-      }
-    } else if (file_is_in_dir(name, kVendorLibDir)) {
-      asan_name_holder = std::string(kAsanVendorLibDir) + "/" + basename(name);
-      if (file_exists(asan_name_holder.c_str())) {
-        translated_name = asan_name_holder.c_str();
-        PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
+  if (g_is_asan && translated_name != nullptr && translated_name[0] == '/') {
+    char translated_path[PATH_MAX];
+    if (realpath(translated_name, translated_path) != nullptr) {
+      if (file_is_in_dir(translated_path, kSystemLibDir)) {
+        asan_name_holder = std::string(kAsanSystemLibDir) + "/" + basename(translated_path);
+        if (file_exists(asan_name_holder.c_str())) {
+          translated_name = asan_name_holder.c_str();
+          PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
+        }
+      } else if (file_is_in_dir(translated_path, kVendorLibDir)) {
+        asan_name_holder = std::string(kAsanVendorLibDir) + "/" + basename(translated_path);
+        if (file_exists(asan_name_holder.c_str())) {
+          translated_name = asan_name_holder.c_str();
+          PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
+        }
       }
     }
   }
@@ -1855,8 +1857,11 @@ static soinfo* soinfo_from_handle(void* handle) {
   return static_cast<soinfo*>(handle);
 }
 
-bool do_dlsym(void* handle, const char* sym_name, const char* sym_ver,
-              void* caller_addr, void** symbol) {
+bool do_dlsym(void* handle,
+              const char* sym_name,
+              const char* sym_ver,
+              const void* caller_addr,
+              void** symbol) {
 #if !defined(__LP64__)
   if (handle == nullptr) {
     DL_ERR("dlsym failed: library handle is null");
@@ -1864,15 +1869,33 @@ bool do_dlsym(void* handle, const char* sym_name, const char* sym_ver,
   }
 #endif
 
-  if (sym_name == nullptr) {
-    DL_ERR("dlsym failed: symbol name is null");
-    return false;
-  }
-
   soinfo* found = nullptr;
   const ElfW(Sym)* sym = nullptr;
   soinfo* caller = find_containing_library(caller_addr);
   android_namespace_t* ns = get_caller_namespace(caller);
+  soinfo* si = nullptr;
+  if (handle != RTLD_DEFAULT && handle != RTLD_NEXT) {
+    si = soinfo_from_handle(handle);
+  }
+
+  LD_LOG(kLogDlsym,
+         "dlsym(handle=%p(\"%s\"), sym_name=\"%s\", sym_ver=\"%s\", caller=\"%s\", caller_ns=%s@%p) ...",
+         handle,
+         si != nullptr ? si->get_realpath() : "n/a",
+         sym_name,
+         sym_ver,
+         caller == nullptr ? "(null)" : caller->get_realpath(),
+         ns == nullptr ? "(null)" : ns->get_name(),
+         ns);
+
+  auto failure_guard = make_scope_guard([&]() {
+    LD_LOG(kLogDlsym, "... dlsym failed: %s", linker_get_error_buffer());
+  });
+
+  if (sym_name == nullptr) {
+    DL_ERR("dlsym failed: symbol name is null");
+    return false;
+  }
 
   version_info vi_instance;
   version_info* vi = nullptr;
@@ -1886,7 +1909,6 @@ bool do_dlsym(void* handle, const char* sym_name, const char* sym_ver,
   if (handle == RTLD_DEFAULT || handle == RTLD_NEXT) {
     sym = dlsym_linear_lookup(ns, sym_name, vi, &found, caller, handle);
   } else {
-    soinfo* si = soinfo_from_handle(handle);
     if (si == nullptr) {
       DL_ERR("dlsym failed: invalid handle: %p", handle);
       return false;
@@ -1899,6 +1921,10 @@ bool do_dlsym(void* handle, const char* sym_name, const char* sym_ver,
 
     if ((bind == STB_GLOBAL || bind == STB_WEAK) && sym->st_shndx != 0) {
       *symbol = reinterpret_cast<void*>(found->resolve_symbol_address(sym));
+      failure_guard.disable();
+      LD_LOG(kLogDlsym,
+             "... dlsym successful: sym_name=\"%s\", sym_ver=\"%s\", found in=\"%s\", address=%p",
+             sym_name, sym_ver, found->get_soname(), *symbol);
       return true;
     }
 

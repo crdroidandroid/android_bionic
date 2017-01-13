@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2012 The Android Open Source Project
+ * Copyright (C) 2016 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,19 +26,30 @@
  * SUCH DAMAGE.
  */
 
-#include <private/bionic_asm.h>
+#ifndef _PRIVATE_ICU_H
+#define _PRIVATE_ICU_H
 
-/*
- * Coding the abort function in assembly so that registers are guaranteed to
- * be preserved properly regardless of GCC's assumption on the "noreturn"
- * attribute. When the registers are not properly preserved we won't be able
- * to unwind the stack all the way to the bottom to fully reveal the call
- * sequence when the crash happens.
- */
-ENTRY(abort)
-    stmfd   sp!, {r3, r14}
-    .cfi_def_cfa_offset 8
-    .cfi_rel_offset r3, 0
-    .cfi_rel_offset r14, 4
-    bl      __libc_android_abort
-END(abort)
+#include <stdint.h>
+
+typedef int8_t UBool;
+typedef int32_t UChar32;
+
+enum UProperty {
+  UCHAR_ALPHABETIC = 0,
+  UCHAR_LOWERCASE = 22,
+  UCHAR_POSIX_ALNUM = 44,
+  UCHAR_POSIX_BLANK = 45,
+  UCHAR_POSIX_GRAPH = 46,
+  UCHAR_POSIX_PRINT = 47,
+  UCHAR_POSIX_XDIGIT = 48,
+  UCHAR_UPPERCASE = 30,
+  UCHAR_WHITE_SPACE = 31,
+};
+
+enum UCharCategory {
+  U_CONTROL_CHAR = 15,
+};
+
+void* __find_icu_symbol(const char* symbol_name);
+
+#endif  // _PRIVATE_ICU_H

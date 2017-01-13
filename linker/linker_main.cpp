@@ -40,7 +40,9 @@
 
 #include "android-base/strings.h"
 #include "android-base/stringprintf.h"
+#ifdef __ANDROID__
 #include "debuggerd/client.h"
+#endif
 
 #include <vector>
 
@@ -158,16 +160,11 @@ static void add_vdso(KernelArgumentBlock& args __unused) {
  * relocate the offset of our exported 'rtld_db_dlactivity' symbol.
  * Note that the linker shouldn't be on the soinfo list.
  */
-static void init_linker_info_for_gdb(ElfW(Addr) linker_base) {
+static void init_linker_info_for_gdb(ElfW(Addr) linker_base, char* linker_path) {
   static link_map linker_link_map_for_gdb;
-#if defined(__LP64__)
-  static char kLinkerPath[] = "/system/bin/linker64";
-#else
-  static char kLinkerPath[] = "/system/bin/linker";
-#endif
 
   linker_link_map_for_gdb.l_addr = linker_base;
-  linker_link_map_for_gdb.l_name = kLinkerPath;
+  linker_link_map_for_gdb.l_name = linker_path;
 
   /*
    * Set the dynamic field in the link map otherwise gdb will complain with
@@ -199,6 +196,12 @@ static const char* get_executable_path() {
   return executable_path.c_str();
 }
 
+#if defined(__LP64__)
+static char kLinkerPath[] = "/system/bin/linker64";
+#else
+static char kLinkerPath[] = "/system/bin/linker";
+#endif
+
 /*
  * This code is called after the linker has linked itself and
  * fixed it's own GOT. It is safe to make references to externs
@@ -217,6 +220,7 @@ static ElfW(Addr) __linker_init_post_relocation(KernelArgumentBlock& args, ElfW(
   __system_properties_init(); // may use 'environ'
 
   // Register the debuggerd signal handler.
+#ifdef __ANDROID__
   debuggerd_callbacks_t callbacks = {
     .get_abort_message = []() {
       return g_abort_message;
@@ -224,6 +228,7 @@ static ElfW(Addr) __linker_init_post_relocation(KernelArgumentBlock& args, ElfW(
     .post_dump = &notify_gdb_of_libraries,
   };
   debuggerd_init(&callbacks);
+#endif
 
   g_linker_logger.ResetState();
 
@@ -278,7 +283,7 @@ static ElfW(Addr) __linker_init_post_relocation(KernelArgumentBlock& args, ElfW(
   map->l_addr = 0;
   map->l_name = const_cast<char*>(executable_path);
   insert_link_map_into_debug_map(map);
-  init_linker_info_for_gdb(linker_base);
+  init_linker_info_for_gdb(linker_base, kLinkerPath);
 
   // Extract information passed from the kernel.
   si->phdr = reinterpret_cast<ElfW(Phdr)*>(args.getauxval(AT_PHDR));
@@ -301,9 +306,21 @@ static ElfW(Addr) __linker_init_post_relocation(KernelArgumentBlock& args, ElfW(
   si->dynamic = nullptr;
 
   ElfW(Ehdr)* elf_hdr = reinterpret_cast<ElfW(Ehdr)*>(si->base);
+
+  // We haven't supported non-PIE since Lollipop for security reasons.
   if (elf_hdr->e_type != ET_DYN) {
-    __libc_fatal("\"%s\": error: only position independent executables (PIE) are supported.",
-                 g_argv[0]);
+    // We don't use __libc_fatal here because we don't want a tombstone: it's
+    // been several years now but we still find ourselves on app compatibility
+    // investigations because some app's trying to launch an executable that
+    // hasn't worked in at least three years, and we've "helpfully" dropped a
+    // tombstone for them. The tombstone never provided any detail relevant to
+    // fixing the problem anyway, and the utility of drawing extra attention
+    // to the problem is non-existent at this late date.
+    __libc_format_fd(STDERR_FILENO,
+                     "\"%s\": error: Android 5.0 and later only support "
+                     "position-independent executables (-fPIE).\n",
+                     g_argv[0]);
+    exit(0);
   }
 
   // Use LD_LIBRARY_PATH and LD_PRELOAD (but only if we aren't setuid/setgid).
@@ -520,9 +537,8 @@ extern "C" ElfW(Addr) __linker_init(void* raw_args) {
   // Initialize static variables. Note that in order to
   // get correct libdl_info we need to call constructors
   // before get_libdl_info().
-  solist = get_libdl_info();
-  sonext = get_libdl_info();
-  g_default_namespace.add_soinfo(get_libdl_info());
+  sonext = solist = get_libdl_info(kLinkerPath);
+  g_default_namespace.add_soinfo(solist);
 
   // We have successfully fixed our own relocations. It's safe to run
   // the main part of the linker now.

@@ -49,8 +49,8 @@ int iswspace_l(wint_t, locale_t) __INTRODUCED_IN(21);
 int iswupper_l(wint_t, locale_t) __INTRODUCED_IN(21);
 int iswxdigit_l(wint_t, locale_t) __INTRODUCED_IN(21);
 
-wint_t towlower_l(int, locale_t) __INTRODUCED_IN(21);
-wint_t towupper_l(int, locale_t) __INTRODUCED_IN(21);
+wint_t towlower_l(wint_t, locale_t) __INTRODUCED_IN(21);
+wint_t towupper_l(wint_t, locale_t) __INTRODUCED_IN(21);
 #else
 // Implemented as static inlines before 21.
 #endif

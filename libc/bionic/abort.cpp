@@ -31,12 +31,7 @@
 #include <stdlib.h>
 #include <unistd.h>
 
-#ifdef __arm__
-extern "C" __LIBC_HIDDEN__ void __libc_android_abort()
-#else
-void abort()
-#endif
-{
+void abort() {
   // Don't block SIGABRT to give any signal handler a chance; we ignore
   // any errors -- X311J doesn't allow abort to return anyway.
   sigset_t mask;
@@ -44,7 +39,7 @@ void abort()
   sigdelset(&mask, SIGABRT);
   sigprocmask(SIG_SETMASK, &mask, NULL);
 
-  raise(SIGABRT);
+  tgkill(getpid(), gettid(), SIGABRT);
 
   // If SIGABRT ignored, or caught and the handler returns,
   // remove the SIGABRT signal handler and raise SIGABRT again.
@@ -54,6 +49,9 @@ void abort()
   sigemptyset(&sa.sa_mask);
   sigaction(SIGABRT, &sa, &sa);
   sigprocmask(SIG_SETMASK, &mask, NULL);
-  raise(SIGABRT);
-  _exit(1);
+
+  tgkill(getpid(), gettid(), SIGABRT);
+
+  // If we get this far, just exit.
+  _exit(127);
 }

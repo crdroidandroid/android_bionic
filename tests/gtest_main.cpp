@@ -20,6 +20,7 @@
 #include <errno.h>
 #include <fcntl.h>
 #include <inttypes.h>
+#include <libgen.h>
 #include <limits.h>
 #include <signal.h>
 #include <stdarg.h>
@@ -63,6 +64,15 @@ bool get_realpath(const std::string& path, std::string* real_path) {
 
   *real_path = realpath_buf;
   return true;
+}
+
+std::string get_dirname(const char* path) {
+#if defined(__BIONIC__)
+  return dirname(path);
+#else
+  // GLIBC does not have const char* dirname
+  return dirname(const_cast<char*>(path));
+#endif
 }
 
 int get_argc() {
@@ -1010,26 +1020,27 @@ static bool PickOptions(std::vector<char*>& args, IsolationTestOptions& options)
   std::string gtest_filter_str;
   for (size_t i = args.size() - 1; i >= 1; --i) {
     if (strncmp(args[i], "--gtest_filter=", strlen("--gtest_filter=")) == 0) {
-      gtest_filter_str = std::string(args[i]);
+      gtest_filter_str = args[i] + strlen("--gtest_filter=");
       args.erase(args.begin() + i);
       break;
     }
   }
   if (enable_selftest == true) {
-    args.push_back(strdup("--gtest_filter=bionic_selftest*"));
+    gtest_filter_str = "bionic_selftest*";
   } else {
-    if (gtest_filter_str == "") {
-      gtest_filter_str = "--gtest_filter=-bionic_selftest*";
+    if (gtest_filter_str.empty()) {
+      gtest_filter_str = "-bionic_selftest*";
     } else {
       // Find if '-' for NEGATIVE_PATTERNS exists.
-      if (gtest_filter_str.find(":-") != std::string::npos) {
+      if (gtest_filter_str.find("-") != std::string::npos) {
         gtest_filter_str += ":bionic_selftest*";
       } else {
         gtest_filter_str += ":-bionic_selftest*";
       }
     }
-    args.push_back(strdup(gtest_filter_str.c_str()));
   }
+  gtest_filter_str = "--gtest_filter=" + gtest_filter_str;
+  args.push_back(strdup(gtest_filter_str.c_str()));
 
   options.isolate = true;
   // Parse arguments that make us can't run in isolation mode.
