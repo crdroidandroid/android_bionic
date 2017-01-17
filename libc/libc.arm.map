@@ -1497,7 +1497,7 @@ LIBC_PRIVATE {
     __bionic_libgcc_compat_symbols; # arm x86
     __cmpdf2; # arm
     __divdf3; # arm
-    __divdi3; # arm x86 mips
+#    __divdi3; # arm x86 mips
     __divsf3; # arm
     __divsi3; # arm
     __dso_handle; # arm
@@ -1520,8 +1520,8 @@ LIBC_PRIVATE {
     __get_thread; # arm x86 mips
     __get_tls; # arm x86 mips
     __getdents64; # arm x86 mips
-    __gnu_ldivmod_helper; # arm
-    __gnu_uldivmod_helper; # arm
+#    __gnu_ldivmod_helper; # arm
+#    __gnu_uldivmod_helper; # arm
     __gnu_Unwind_Backtrace; # arm
     __gnu_unwind_execute; # arm
     __gnu_Unwind_Find_exidx; # arm
@@ -1574,7 +1574,7 @@ LIBC_PRIVATE {
     __swrite; # arm x86 mips
     __swsetup; # arm x86 mips
     __truncdfsf2; # arm
-    __udivdi3; # arm x86 mips
+#    __udivdi3; # arm x86 mips
     __udivsi3; # arm
     __unorddf2; # arm
     __unordsf2; # arm
