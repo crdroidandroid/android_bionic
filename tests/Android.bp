@@ -295,6 +295,7 @@ cc_test_library {
     target: {
         android: {
             srcs: [
+                "cfi_test.cpp",
                 "dlext_test.cpp",
                 "libdl_test.cpp",
             ],
@@ -365,6 +366,8 @@ cc_defaults {
     ldflags: ["-Wl,--export-dynamic"],
 
     include_dirs: ["bionic/libc"],
+
+    stl: "libc++_static",
 
     target: {
         android: {
@@ -440,7 +443,7 @@ cc_test {
         "libtinyxml2",
         "liblog",
         "libbase",
-        "libdebuggerd_client",
+        "libdebuggerd_handler",
     ],
 
     static_executable: true,
