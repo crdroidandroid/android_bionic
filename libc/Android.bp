@@ -12,7 +12,6 @@ libc_common_src_files = [
     "bionic/sigblock.c",
     "bionic/siginterrupt.c",
     "bionic/sigsetmask.c",
-    "bionic/system_properties_compat.c",
     "stdio/fread.c",
     "stdio/parsefloat.c",
     "stdio/refill.c",
@@ -1869,6 +1868,21 @@ cc_object {
     ],
 }
 
+cc_object {
+    name: "kuser_helper_on",
+    local_include_dirs: ["include"],
+    arch: {
+        arm: {
+            srcs: ["arch-arm/bionic/kuser_helper_on.S"],
+        },
+    },
+
+    defaults: [
+        "crt_defaults",
+        "crt_so_defaults",
+    ],
+}
+
 // Android.mk:ignore
 cc_object {
     name: "crtbegin_so1",
@@ -1893,6 +1907,11 @@ cc_object {
         "crtbegin_so1",
         "crtbrand",
     ],
+    arch: {
+        arm: {
+            objs: ["kuser_helper_on"],
+        },
+    },
 }
 
 // Android.mk:ignore
@@ -1951,6 +1970,11 @@ cc_object {
         "crtbegin_static1",
         "crtbrand",
     ],
+    arch: {
+        arm: {
+            objs: ["kuser_helper_on"],
+        },
+    },
     defaults: ["crt_defaults"],
 }
 
@@ -1997,6 +2021,11 @@ cc_object {
         "crtbegin_dynamic1",
         "crtbrand",
     ],
+    arch: {
+        arm: {
+            objs: ["kuser_helper_on"],
+        },
+    },
     defaults: ["crt_defaults"],
 }
 
