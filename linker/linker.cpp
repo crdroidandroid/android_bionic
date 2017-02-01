@@ -1040,13 +1040,12 @@ class ProtectedDataGuard {
     if (ref_count_++ == 0) {
       protect_data(PROT_READ | PROT_WRITE);
     }
-  }
-
-  ~ProtectedDataGuard() {
     if (ref_count_ == 0) { // overflow
       __libc_fatal("Too many nested calls to dlopen()");
     }
+  }
 
+  ~ProtectedDataGuard() {
     if (--ref_count_ == 0) {
       protect_data(PROT_READ);
     }
