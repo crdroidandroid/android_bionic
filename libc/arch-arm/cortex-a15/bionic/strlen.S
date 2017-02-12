@@ -1,165 +1,91 @@
 /*
- * Copyright (C) 2013 The Android Open Source Project
- * All rights reserved.
+ * Copyright (c) 2011 Apple, Inc. All rights reserved.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- *  * Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- *  * Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in
- *    the documentation and/or other materials provided with the
- *    distribution.
+ * @APPLE_LICENSE_HEADER_START@
  *
- * THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
- * "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
- * LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS
- * FOR A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE
- * COPYRIGHT OWNER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT,
- * INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING,
- * BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS
- * OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED
- * AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY,
- * OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT
- * OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
-/*
- * Copyright (c) 2013 ARM Ltd
- * All rights reserved.
+ * This file contains Original Code and/or Modifications of Original Code
+ * as defined in and that are subject to the Apple Public Source License
+ * Version 2.0 (the 'License'). You may not use this file except in
+ * compliance with the License. Please obtain a copy of the License at
+ * http://www.opensource.apple.com/apsl/ and read it before using this
+ * file.
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the company may not be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
+ * The Original Code and all software distributed under the License are
+ * distributed on an 'AS IS' basis, WITHOUT WARRANTY OF ANY KIND, EITHER
+ * EXPRESS OR IMPLIED, AND APPLE HEREBY DISCLAIMS ALL SUCH WARRANTIES,
+ * INCLUDING WITHOUT LIMITATION, ANY WARRANTIES OF MERCHANTABILITY,
+ * FITNESS FOR A PARTICULAR PURPOSE, QUIET ENJOYMENT OR NON-INFRINGEMENT.
+ * Please see the License for the specific language governing rights and
+ * limitations under the License.
  *
- * THIS SOFTWARE IS PROVIDED BY ARM LTD ``AS IS'' AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL ARM LTD BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * @APPLE_LICENSE_HEADER_END@
  */
 
 #include <private/bionic_asm.h>
 
-    .syntax unified
+.syntax unified
+.code 32
 
-    .thumb
-    .thumb_func
+#define addr r0
+#define word r1
+#define temp r2
+#define mask r3
+#define save ip
+#define indx r0
 
+.macro IfWordDoesntContainNUL_SetZ
+//  In each word of the string, we check for NUL bytes via a saturating
+//  unsigned subtraction of each byte from 0x1.  The result of this is
+//  non-zero if and only if the corresponding byte in the string is NUL.
+//  Simply using a TST instruction checks all four bytes for NULs in one
+//  go.
+    uqsub8  temp,   mask,   word
+    tst     temp,           temp
+.endm
+
+.text
+.align 4
+.long 0x0           // padding
+.long 0x01010101    // mask for use in finding NULs
 ENTRY(strlen)
-    pld     [r0, #0]
-    mov     r1, r0
+//  Establish stack frame, load mask that we will use to find NUL bytes,
+//  and set aside a copy of the pointer to the string.
+    push    {r7,lr}
+    mov     r7,     sp
+    ldr     mask,   (strlen-4)
+    add		save,   addr,   #4
 
-    ands    r3, r0, #7
-    beq     .L_mainloop
+//  Load the aligned word that contains the start of the string, then OR
+//  0x01 into any bytes that preceed the start of the string to prevent
+//  false positives when we check for NUL bytes.
+    and     temp,   addr,   #3
+    bic     addr,   addr,   #3
+    lsl     temp,   temp,   #3
+    ldr     word,  [addr],  #4
+    rsb     temp,   temp,   #32
+    orr     word,   word,   mask, lsr temp
 
-    // Align to a double word (64 bits).
-    rsb     r3, r3, #8
-    lsls    ip, r3, #31
-    beq     .L_align_to_32
+//  Check if the string ends in the first word.  If so, don't load any
+//  more of the string; instead jump directly to the cleanup code.
+    IfWordDoesntContainNUL_SetZ
+    bne     1f
 
-    ldrb    r2, [r1], #1
-    cbz     r2, .L_update_count_and_return
+.align 4
+//  Load one word of the string on each iteration, and check it for NUL
+//  bytes.  If a NUL is found, fall through into the cleanup code.
+0:  ldr     word,  [addr],  #4
+    IfWordDoesntContainNUL_SetZ
+    beq		0b
 
-.L_align_to_32:
-    bcc     .L_align_to_64
-    ands    ip, r3, #2
-    beq     .L_align_to_64
+//  The last word that we loaded contained a NUL.  Subtracting the saved
+//  pointer from the current pointer gives us the number of bytes from
+//  the start of the string to the word containing the NUL.
+1:  sub     indx,   addr,   save
+//  To that we add the index of the first NUL byte in the word, computed
+//  using REV and CLZ followed by a shift.
+    rev     temp,           temp
+    clz     temp,           temp
+    add     indx,   indx,   temp, lsr #3
+    pop     {r7,pc}
 
-    ldrb    r2, [r1], #1
-    cbz     r2, .L_update_count_and_return
-    ldrb    r2, [r1], #1
-    cbz     r2, .L_update_count_and_return
-
-.L_align_to_64:
-    tst     r3, #4
-    beq     .L_mainloop
-    ldr     r3, [r1], #4
-
-    sub     ip, r3, #0x01010101
-    bic     ip, ip, r3
-    ands    ip, ip, #0x80808080
-    bne     .L_zero_in_second_register
-
-    .p2align 2
-.L_mainloop:
-    ldrd    r2, r3, [r1], #8
-
-    pld     [r1, #64]
-
-    sub     ip, r2, #0x01010101
-    bic     ip, ip, r2
-    ands    ip, ip, #0x80808080
-    bne     .L_zero_in_first_register
-
-    sub     ip, r3, #0x01010101
-    bic     ip, ip, r3
-    ands    ip, ip, #0x80808080
-    bne     .L_zero_in_second_register
-    b       .L_mainloop
-
-.L_update_count_and_return:
-    sub     r0, r1, r0
-    sub     r0, r0, #1
-    bx      lr
-
-.L_zero_in_first_register:
-    sub     r0, r1, r0
-    lsls    r3, ip, #17
-    bne     .L_sub8_and_return
-    bcs     .L_sub7_and_return
-    lsls    ip, ip, #1
-    bne     .L_sub6_and_return
-
-    sub     r0, r0, #5
-    bx      lr
-
-.L_sub8_and_return:
-    sub     r0, r0, #8
-    bx      lr
-
-.L_sub7_and_return:
-    sub     r0, r0, #7
-    bx      lr
-
-.L_sub6_and_return:
-    sub     r0, r0, #6
-    bx      lr
-
-.L_zero_in_second_register:
-    sub     r0, r1, r0
-    lsls    r3, ip, #17
-    bne     .L_sub4_and_return
-    bcs     .L_sub3_and_return
-    lsls    ip, ip, #1
-    bne     .L_sub2_and_return
-
-    sub     r0, r0, #1
-    bx      lr
-
-.L_sub4_and_return:
-    sub     r0, r0, #4
-    bx      lr
-
-.L_sub3_and_return:
-    sub     r0, r0, #3
-    bx      lr
-
-.L_sub2_and_return:
-    sub     r0, r0, #2
-    bx      lr
 END(strlen)
