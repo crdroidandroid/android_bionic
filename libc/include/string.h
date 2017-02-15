@@ -161,7 +161,7 @@ size_t __strlcat_chk(char* _Nonnull __restrict, const char* _Nonnull __restrict,
 /* Only used with FORTIFY, but some headers that need it undef FORTIFY, so we
  * have the definition out here.
  */
-struct __bionic_zero_size_is_okay_t {};
+struct __bionic_zero_size_is_okay_t {char dummy;};
 
 #if defined(__BIONIC_FORTIFY)
 // These can share their implementation between gcc and clang with minimal
