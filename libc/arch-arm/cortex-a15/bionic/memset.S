@@ -67,110 +67,51 @@ ENTRY(bzero)
 END(bzero)
 
 ENTRY(memset)
+
+        .save       {r0}
         stmfd       sp!, {r0}
-        .cfi_def_cfa_offset 4
-        .cfi_rel_offset r0, 0
 
-        // The new algorithm is slower for copies < 16 so use the old
-        // neon code in that case.
+        vdup.8      q0, r1
+
+        /* do we have at least 16-bytes to write (needed for alignment below) */
         cmp         r2, #16
-        blo         .L_set_less_than_16_unknown_align
+        blo         3f
+        /* align destination to 16 bytes for the write-buffer */
+        rsb         r3, r0, #0
+        ands        r3, r3, #0xF
+        beq         2f
+        /* write up to 15-bytes (count in r3) */
+        sub         r2, r2, r3
+        movs        ip, r3, lsl #31
+        strbmi      r1, [r0], #1
+        strbcs      r1, [r0], #1
+        strbcs      r1, [r0], #1
+        movs        ip, r3, lsl #29
+        bge         1f
+        // writes 4 bytes, 32-bits aligned
+        vst1.32     {d0[0]}, [r0, :32]!
+1:      bcc         2f
+        // writes 8 bytes, 64-bits aligned
+        vst1.8      {d0}, [r0, :64]!
+2:
+        /* make sure we have at least 32 bytes to write */
+        subs        r2, r2, #32
+        blo         2f
+        vmov        q1, q0
 
-        // Use strd which requires an even and odd register so move the
-        // values so that:
-        //   r0 and r1 contain the memset value
-        //   r2 is the number of bytes to set
-        //   r3 is the destination pointer
-        mov         r3, r0
+1:      /* The main loop writes 32 bytes at a time */
+        subs        r2, r2, #32
+        vst1.8      {d0 - d3}, [r0, :128]!
+        bhs         1b
 
-        // Copy the byte value in every byte of r1.
-        mov         r1, r1, lsl #24
-        orr         r1, r1, r1, lsr #8
-        orr         r1, r1, r1, lsr #16
+2:      /* less than 32 left */
+        add         r2, r2, #32
+        tst         r2, #0x10
+        beq         3f
 
-.L_check_alignment:
-        // Align destination to a double word to avoid the strd crossing
-        // a cache line boundary.
-        ands        ip, r3, #7
-        bne         .L_do_double_word_align
-
-.L_double_word_aligned:
-        mov         r0, r1
-
-        subs        r2, #64
-        blo         .L_set_less_than_64
-
-1:      // Main loop sets 64 bytes at a time.
-        .irp        offset, #0, #8, #16, #24, #32, #40, #48, #56
-        strd        r0, r1, [r3, \offset]
-        .endr
-
-        add         r3, #64
-        subs        r2, #64
-        bge         1b
-
-.L_set_less_than_64:
-        // Restore r2 to the count of bytes left to set.
-        add         r2, #64
-        lsls        ip, r2, #27
-        bcc         .L_set_less_than_32
-        // Set 32 bytes.
-        .irp        offset, #0, #8, #16, #24
-        strd        r0, r1, [r3, \offset]
-        .endr
-        add         r3, #32
-
-.L_set_less_than_32:
-        bpl         .L_set_less_than_16
-        // Set 16 bytes.
-        .irp        offset, #0, #8
-        strd        r0, r1, [r3, \offset]
-        .endr
-        add         r3, #16
-
-.L_set_less_than_16:
-        // Less than 16 bytes to set.
-        lsls        ip, r2, #29
-        bcc         .L_set_less_than_8
-
-        // Set 8 bytes.
-        strd        r0, r1, [r3], #8
-
-.L_set_less_than_8:
-        bpl         .L_set_less_than_4
-        // Set 4 bytes
-        str         r1, [r3], #4
-
-.L_set_less_than_4:
-        lsls        ip, r2, #31
-        it          ne
-        strbne      r1, [r3], #1
-        itt         cs
-        strbcs      r1, [r3], #1
-        strbcs      r1, [r3]
-
-        ldmfd       sp!, {r0}
-        bx          lr
-
-.L_do_double_word_align:
-        rsb         ip, ip, #8
-        sub         r2, r2, ip
-        movs        r0, ip, lsl #31
-        it          mi
-        strbmi      r1, [r3], #1
-        itt         cs
-        strbcs      r1, [r3], #1
-        strbcs      r1, [r3], #1
-
-        // Dst is at least word aligned by this point.
-        cmp         ip, #4
-        blo         .L_double_word_aligned
-        str         r1, [r3], #4
-        b           .L_double_word_aligned
-
-.L_set_less_than_16_unknown_align:
-        // Set up to 15 bytes.
-        vdup.8      d0, r1
+        // writes 16 bytes, 128-bits unaligned
+        vst1.8      {d0, d1}, [r0, :128]!
+3:      /* write up to 15-bytes (count in r2) */
         movs        ip, r2, lsl #29
         bcc         1f
         vst1.8      {d0}, [r0]!
