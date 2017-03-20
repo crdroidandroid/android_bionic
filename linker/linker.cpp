@@ -78,19 +78,39 @@ static LinkerTypeAllocator<android_namespace_t> g_namespace_allocator;
 static LinkerTypeAllocator<LinkedListEntry<android_namespace_t>> g_namespace_list_allocator;
 
 #if defined(__LP64__)
-static const char* const kSystemLibDir     = "/system/lib64";
-static const char* const kVendorLibDir     = "/vendor/lib64";
-static const char* const kAsanSystemLibDir = "/data/lib64";
-static const char* const kAsanVendorLibDir = "/data/vendor/lib64";
+static const char* const kSystemLibDir           = "/system/lib64";
+static const char* const kSystemNdkLibDir       = "/system/lib64/ndk";
+static const char* const kSystemVndkLibDir       = "/system/lib64/vndk";
+static const char* const kSystemVndkExtLibDir    = "/system/lib64/vndk-ext";
+static const char* const kVendorSpHalLibDir      = "/vendor/lib64/sameprocess";
+static const char* const kVendorLibDir           = "/vendor/lib64";
+static const char* const kAsanSystemLibDir       = "/data/lib64";
+static const char* const kAsanSystemNdkLibDir       = "/data/lib64/ndk";
+static const char* const kAsanSystemVndkLibDir       = "/data/lib64/vndk";
+static const char* const kAsanSystemVndkExtLibDir    = "/data/lib64/vndk-ext";
+static const char* const kAsanVendorSpHalLibDir      = "/data/vendor/lib64/sameprocess";
+static const char* const kAsanVendorLibDir       = "/data/vendor/lib64";
 #else
-static const char* const kSystemLibDir     = "/system/lib";
-static const char* const kVendorLibDir     = "/vendor/lib";
-static const char* const kAsanSystemLibDir = "/data/lib";
-static const char* const kAsanVendorLibDir = "/data/vendor/lib";
+static const char* const kSystemLibDir           = "/system/lib";
+static const char* const kSystemNdkLibDir       = "/system/lib/ndk";
+static const char* const kSystemVndkLibDir       = "/system/lib/vndk";
+static const char* const kSystemVndkExtLibDir    = "/system/lib/vndk-ext";
+static const char* const kVendorSpHalLibDir      = "/vendor/lib/sameprocess";
+static const char* const kVendorLibDir           = "/vendor/lib";
+static const char* const kAsanSystemLibDir       = "/data/lib";
+static const char* const kAsanSystemNdkLibDir       = "/data/lib/ndk";
+static const char* const kAsanSystemVndkLibDir       = "/data/lib/vndk";
+static const char* const kAsanSystemVndkExtLibDir    = "/data/lib/vndk-ext";
+static const char* const kAsanVendorSpHalLibDir      = "/data/vendor/lib/sameprocess";
+static const char* const kAsanVendorLibDir       = "/data/vendor/lib";
 #endif
 
 static const char* const kDefaultLdPaths[] = {
   kSystemLibDir,
+  kSystemNdkLibDir,
+  kSystemVndkExtLibDir,
+  kSystemVndkLibDir,
+  kVendorSpHalLibDir,
   kVendorLibDir,
   nullptr
 };
@@ -98,6 +118,14 @@ static const char* const kDefaultLdPaths[] = {
 static const char* const kAsanDefaultLdPaths[] = {
   kAsanSystemLibDir,
   kSystemLibDir,
+  kAsanSystemNdkLibDir,
+  kSystemNdkLibDir,
+  kAsanSystemVndkExtLibDir,
+  kSystemVndkExtLibDir,
+  kAsanSystemVndkLibDir,
+  kSystemVndkLibDir,
+  kAsanVendorSpHalLibDir,
+  kVendorSpHalLibDir,
   kAsanVendorLibDir,
   kVendorLibDir,
   nullptr
@@ -1889,14 +1917,16 @@ void* do_dlopen(const char* name, int flags,
   if (g_is_asan && translated_name != nullptr && translated_name[0] == '/') {
     char translated_path[PATH_MAX];
     if (realpath(translated_name, translated_path) != nullptr) {
-      if (file_is_in_dir(translated_path, kSystemLibDir)) {
-        asan_name_holder = std::string(kAsanSystemLibDir) + "/" + basename(translated_path);
+      if (file_is_under_dir(translated_path, kSystemLibDir)) {
+        asan_name_holder = std::string(kAsanSystemLibDir) + "/" +
+            (translated_path + strlen(kSystemLibDir) + 1);
         if (file_exists(asan_name_holder.c_str())) {
           translated_name = asan_name_holder.c_str();
           PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
         }
-      } else if (file_is_in_dir(translated_path, kVendorLibDir)) {
-        asan_name_holder = std::string(kAsanVendorLibDir) + "/" + basename(translated_path);
+      } else if (file_is_under_dir(translated_path, kVendorLibDir)) {
+        asan_name_holder = std::string(kAsanVendorLibDir) + "/" +
+            (translated_path + strlen(kVendorLibDir) + 1);
         if (file_exists(asan_name_holder.c_str())) {
           translated_name = asan_name_holder.c_str();
           PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
