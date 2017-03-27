@@ -409,18 +409,25 @@ void soinfo::call_constructors() {
     si->call_constructors();
   });
 
-  TRACE("\"%s\": calling constructors", get_realpath());
+  if (!is_linker()) {
+    bionic_trace_begin((std::string("calling constructors: ") + get_realpath()).c_str());
+  }
 
   // DT_INIT should be called before DT_INIT_ARRAY if both are present.
   call_function("DT_INIT", init_func_, get_realpath());
   call_array("DT_INIT_ARRAY", init_array_, init_array_count_, false, get_realpath());
+
+  if (!is_linker()) {
+    bionic_trace_end();
+  }
 }
 
 void soinfo::call_destructors() {
   if (!constructors_called) {
     return;
   }
-  TRACE("\"%s\": calling destructors", get_realpath());
+
+  ScopedTrace trace((std::string("calling destructors: ") + get_realpath()).c_str());
 
   // DT_FINI_ARRAY must be parsed in reverse order.
   call_array("DT_FINI_ARRAY", fini_array_, fini_array_count_, true, get_realpath());
