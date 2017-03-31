@@ -166,12 +166,6 @@ cc_binary {
     },
     compile_multilib: "both",
 
-    // Leave the symbols in the shared library so that stack unwinders can produce
-    // meaningful name resolution.
-    strip: {
-        keep_symbols: true,
-    },
-
     // Insert an extra objcopy step to add prefix to symbols. This is needed to prevent gdb
     // looking up symbols in the linker by mistake.
     prefix_symbols: "__dl_",
