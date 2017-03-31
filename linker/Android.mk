@@ -88,10 +88,6 @@ LOCAL_MODULE_STEM_32 := linker
 LOCAL_MODULE_STEM_64 := linker64
 LOCAL_MULTILIB := both
 
-# Leave the symbols in the shared library so that stack unwinders can produce
-# meaningful name resolution.
-LOCAL_STRIP_MODULE := keep_symbols
-
 # Insert an extra objcopy step to add prefix to symbols. This is needed to prevent gdb
 # looking up symbols in the linker by mistake.
 #
