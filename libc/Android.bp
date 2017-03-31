@@ -1777,12 +1777,6 @@ cc_library {
 
     required: ["tzdata"],
 
-    // Leave the symbols in the shared library so that stack unwinders can produce
-    // meaningful name resolution.
-    strip: {
-        keep_symbols: true,
-    },
-
     // Do not pack libc.so relocations; see http://b/20645321 for details.
     pack_relocations: false,
 
