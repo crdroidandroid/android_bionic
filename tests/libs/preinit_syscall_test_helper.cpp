@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -14,13 +14,27 @@
  * limitations under the License.
  */
 
-#ifndef SECCOMP_POLICY_H
-#define SECCOMP_POLICY_H
+#include <errno.h>
+#include <stdio.h>
+#include <unistd.h>
+#include <sys/auxv.h>
 
-#include <stddef.h>
-#include <linux/filter.h>
+#include "libs_utils.h"
 
-bool set_seccomp_filter();
-void get_seccomp_filter(const sock_filter*& filter, size_t& filter_size);
+static ssize_t g_result;
+static int g_errno;
 
-#endif
+static void preinit_ctor() {
+  // Can we make a system call?
+  g_result = write(-1, "", 1);
+  g_errno = errno;
+}
+
+__attribute__((section(".preinit_array"), used)) void (*preinit_ctor_p)(void) = preinit_ctor;
+
+int main() {
+  // Did we get the expected failure?
+  CHECK(g_result == -1);
+  CHECK(g_errno == EBADF);
+  return 0;
+}

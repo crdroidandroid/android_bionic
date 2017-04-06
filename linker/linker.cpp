@@ -49,6 +49,7 @@
 #include "linker.h"
 #include "linker_block_allocator.h"
 #include "linker_cfi.h"
+#include "linker_config.h"
 #include "linker_gdb_support.h"
 #include "linker_globals.h"
 #include "linker_debug.h"
@@ -77,40 +78,24 @@ static LinkerTypeAllocator<LinkedListEntry<soinfo>> g_soinfo_links_allocator;
 static LinkerTypeAllocator<android_namespace_t> g_namespace_allocator;
 static LinkerTypeAllocator<LinkedListEntry<android_namespace_t>> g_namespace_list_allocator;
 
+static const char* const kLdConfigFilePath = "/system/etc/ld.config.txt";
+
 #if defined(__LP64__)
-static const char* const kSystemLibDir           = "/system/lib64";
-static const char* const kSystemNdkLibDir       = "/system/lib64/ndk";
-static const char* const kSystemVndkLibDir       = "/system/lib64/vndk";
-static const char* const kSystemVndkExtLibDir    = "/system/lib64/vndk-ext";
-static const char* const kVendorSpHalLibDir      = "/vendor/lib64/sameprocess";
-static const char* const kVendorLibDir           = "/vendor/lib64";
-static const char* const kAsanSystemLibDir       = "/data/lib64";
-static const char* const kAsanSystemNdkLibDir       = "/data/lib64/ndk";
-static const char* const kAsanSystemVndkLibDir       = "/data/lib64/vndk";
-static const char* const kAsanSystemVndkExtLibDir    = "/data/lib64/vndk-ext";
-static const char* const kAsanVendorSpHalLibDir      = "/data/vendor/lib64/sameprocess";
-static const char* const kAsanVendorLibDir       = "/data/vendor/lib64";
+static const char* const kSystemLibDir     = "/system/lib64";
+static const char* const kVendorLibDir     = "/vendor/lib64";
+static const char* const kAsanSystemLibDir = "/data/asan/system/lib64";
+static const char* const kAsanVendorLibDir = "/data/asan/vendor/lib64";
 #else
-static const char* const kSystemLibDir           = "/system/lib";
-static const char* const kSystemNdkLibDir       = "/system/lib/ndk";
-static const char* const kSystemVndkLibDir       = "/system/lib/vndk";
-static const char* const kSystemVndkExtLibDir    = "/system/lib/vndk-ext";
-static const char* const kVendorSpHalLibDir      = "/vendor/lib/sameprocess";
-static const char* const kVendorLibDir           = "/vendor/lib";
-static const char* const kAsanSystemLibDir       = "/data/lib";
-static const char* const kAsanSystemNdkLibDir       = "/data/lib/ndk";
-static const char* const kAsanSystemVndkLibDir       = "/data/lib/vndk";
-static const char* const kAsanSystemVndkExtLibDir    = "/data/lib/vndk-ext";
-static const char* const kAsanVendorSpHalLibDir      = "/data/vendor/lib/sameprocess";
-static const char* const kAsanVendorLibDir       = "/data/vendor/lib";
+static const char* const kSystemLibDir     = "/system/lib";
+static const char* const kVendorLibDir     = "/vendor/lib";
+static const char* const kAsanSystemLibDir = "/data/asan/system/lib";
+static const char* const kAsanVendorLibDir = "/data/asan/vendor/lib";
 #endif
+
+static const char* const kAsanLibDirPrefix = "/data/asan";
 
 static const char* const kDefaultLdPaths[] = {
   kSystemLibDir,
-  kSystemNdkLibDir,
-  kSystemVndkExtLibDir,
-  kSystemVndkLibDir,
-  kVendorSpHalLibDir,
   kVendorLibDir,
   nullptr
 };
@@ -118,14 +103,6 @@ static const char* const kDefaultLdPaths[] = {
 static const char* const kAsanDefaultLdPaths[] = {
   kAsanSystemLibDir,
   kSystemLibDir,
-  kAsanSystemNdkLibDir,
-  kSystemNdkLibDir,
-  kAsanSystemVndkExtLibDir,
-  kSystemVndkExtLibDir,
-  kAsanSystemVndkLibDir,
-  kSystemVndkLibDir,
-  kAsanVendorSpHalLibDir,
-  kVendorSpHalLibDir,
   kAsanVendorLibDir,
   kVendorLibDir,
   nullptr
@@ -1135,11 +1112,43 @@ static void for_each_dt_needed(const ElfReader& elf_reader, F action) {
   }
 }
 
+static bool find_loaded_library_by_inode(android_namespace_t* ns,
+                                         const struct stat& file_stat,
+                                         off64_t file_offset,
+                                         bool search_linked_namespaces,
+                                         soinfo** candidate) {
+
+  auto predicate = [&](soinfo* si) {
+    return si->get_st_dev() != 0 &&
+           si->get_st_ino() != 0 &&
+           si->get_st_dev() == file_stat.st_dev &&
+           si->get_st_ino() == file_stat.st_ino &&
+           si->get_file_offset() == file_offset;
+  };
+
+  *candidate = ns->soinfo_list().find_if(predicate);
+
+  if (*candidate == nullptr && search_linked_namespaces) {
+    for (auto& link : ns->linked_namespaces()) {
+      android_namespace_t* linked_ns = link.linked_namespace();
+      soinfo* si = linked_ns->soinfo_list().find_if(predicate);
+
+      if (si != nullptr && link.is_accessible(si->get_soname())) {
+        *candidate = si;
+        return true;
+      }
+    }
+  }
+
+  return *candidate != nullptr;
+}
+
 static bool load_library(android_namespace_t* ns,
                          LoadTask* task,
                          LoadTaskList* load_tasks,
                          int rtld_flags,
-                         const std::string& realpath) {
+                         const std::string& realpath,
+                         bool search_linked_namespaces) {
   off64_t file_offset = task->get_file_offset();
   const char* name = task->get_name();
   const android_dlextinfo* extinfo = task->get_extinfo();
@@ -1167,17 +1176,8 @@ static bool load_library(android_namespace_t* ns,
   // Check for symlink and other situations where
   // file can have different names, unless ANDROID_DLEXT_FORCE_LOAD is set
   if (extinfo == nullptr || (extinfo->flags & ANDROID_DLEXT_FORCE_LOAD) == 0) {
-    auto predicate = [&](soinfo* si) {
-      return si->get_st_dev() != 0 &&
-             si->get_st_ino() != 0 &&
-             si->get_st_dev() == file_stat.st_dev &&
-             si->get_st_ino() == file_stat.st_ino &&
-             si->get_file_offset() == file_offset;
-    };
-
-    soinfo* si = ns->soinfo_list().find_if(predicate);
-
-    if (si != nullptr) {
+    soinfo* si = nullptr;
+    if (find_loaded_library_by_inode(ns, file_stat, file_offset, search_linked_namespaces, &si)) {
       TRACE("library \"%s\" is already loaded under different name/path \"%s\" - "
             "will return existing soinfo", name, si->get_realpath());
       task->set_soinfo(si);
@@ -1272,7 +1272,8 @@ static bool load_library(android_namespace_t* ns,
                          LoadTask* task,
                          ZipArchiveCache* zip_archive_cache,
                          LoadTaskList* load_tasks,
-                         int rtld_flags) {
+                         int rtld_flags,
+                         bool search_linked_namespaces) {
   const char* name = task->get_name();
   soinfo* needed_by = task->get_needed_by();
   const android_dlextinfo* extinfo = task->get_extinfo();
@@ -1293,7 +1294,7 @@ static bool load_library(android_namespace_t* ns,
 
     task->set_fd(extinfo->library_fd, false);
     task->set_file_offset(file_offset);
-    return load_library(ns, task, load_tasks, rtld_flags, realpath);
+    return load_library(ns, task, load_tasks, rtld_flags, realpath, search_linked_namespaces);
   }
 
   // Open the file.
@@ -1306,19 +1307,12 @@ static bool load_library(android_namespace_t* ns,
   task->set_fd(fd, true);
   task->set_file_offset(file_offset);
 
-  return load_library(ns, task, load_tasks, rtld_flags, realpath);
+  return load_library(ns, task, load_tasks, rtld_flags, realpath, search_linked_namespaces);
 }
 
-// Returns true if library was found and false otherwise
 static bool find_loaded_library_by_soname(android_namespace_t* ns,
-                                         const char* name, soinfo** candidate) {
-  *candidate = nullptr;
-
-  // Ignore filename with path.
-  if (strchr(name, '/') != nullptr) {
-    return false;
-  }
-
+                                          const char* name,
+                                          soinfo** candidate) {
   return !ns->soinfo_list().visit([&](soinfo* si) {
     const char* soname = si->get_soname();
     if (soname != nullptr && (strcmp(name, soname) == 0)) {
@@ -1330,6 +1324,38 @@ static bool find_loaded_library_by_soname(android_namespace_t* ns,
   });
 }
 
+// Returns true if library was found and false otherwise
+static bool find_loaded_library_by_soname(android_namespace_t* ns,
+                                         const char* name,
+                                         bool search_linked_namespaces,
+                                         soinfo** candidate) {
+  *candidate = nullptr;
+
+  // Ignore filename with path.
+  if (strchr(name, '/') != nullptr) {
+    return false;
+  }
+
+  bool found = find_loaded_library_by_soname(ns, name, candidate);
+
+  if (!found && search_linked_namespaces) {
+    // if a library was not found - look into linked namespaces
+    for (auto& link : ns->linked_namespaces()) {
+      if (!link.is_accessible(name)) {
+        continue;
+      }
+
+      android_namespace_t* linked_ns = link.linked_namespace();
+
+      if (find_loaded_library_by_soname(linked_ns, name, candidate)) {
+        return true;
+      }
+    }
+  }
+
+  return found;
+}
+
 static bool find_library_in_linked_namespace(const android_namespace_link_t& namespace_link,
                                              LoadTask* task,
                                              int rtld_flags) {
@@ -1339,7 +1365,7 @@ static bool find_library_in_linked_namespace(const android_namespace_link_t& nam
   bool loaded = false;
 
   std::string soname;
-  if (find_loaded_library_by_soname(ns, task->get_name(), &candidate)) {
+  if (find_loaded_library_by_soname(ns, task->get_name(), false, &candidate)) {
     loaded = true;
     soname = candidate->get_soname();
   } else {
@@ -1390,7 +1416,7 @@ static bool find_library_internal(android_namespace_t* ns,
                                   bool search_linked_namespaces) {
   soinfo* candidate;
 
-  if (find_loaded_library_by_soname(ns, task->get_name(), &candidate)) {
+  if (find_loaded_library_by_soname(ns, task->get_name(), search_linked_namespaces, &candidate)) {
     task->set_soinfo(candidate);
     return true;
   }
@@ -1400,7 +1426,7 @@ static bool find_library_internal(android_namespace_t* ns,
   TRACE("[ \"%s\" find_loaded_library_by_soname failed (*candidate=%s@%p). Trying harder...]",
       task->get_name(), candidate == nullptr ? "n/a" : candidate->get_realpath(), candidate);
 
-  if (load_library(ns, task, zip_archive_cache, load_tasks, rtld_flags)) {
+  if (load_library(ns, task, zip_archive_cache, load_tasks, rtld_flags, search_linked_namespaces)) {
     return true;
   }
 
@@ -1922,20 +1948,10 @@ void* do_dlopen(const char* name, int flags,
   if (g_is_asan && translated_name != nullptr && translated_name[0] == '/') {
     char translated_path[PATH_MAX];
     if (realpath(translated_name, translated_path) != nullptr) {
-      if (file_is_under_dir(translated_path, kSystemLibDir)) {
-        asan_name_holder = std::string(kAsanSystemLibDir) + "/" +
-            (translated_path + strlen(kSystemLibDir) + 1);
-        if (file_exists(asan_name_holder.c_str())) {
-          translated_name = asan_name_holder.c_str();
-          PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
-        }
-      } else if (file_is_under_dir(translated_path, kVendorLibDir)) {
-        asan_name_holder = std::string(kAsanVendorLibDir) + "/" +
-            (translated_path + strlen(kVendorLibDir) + 1);
-        if (file_exists(asan_name_holder.c_str())) {
-          translated_name = asan_name_holder.c_str();
-          PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
-        }
+      asan_name_holder = std::string(kAsanLibDirPrefix) + translated_path;
+      if (file_exists(asan_name_holder.c_str())) {
+        translated_name = asan_name_holder.c_str();
+        PRINT("linker_asan dlopen translating \"%s\" -> \"%s\"", name, translated_name);
       }
     }
   }
@@ -2106,8 +2122,7 @@ bool init_anonymous_namespace(const char* shared_lib_sonames, const char* librar
                        "(anonymous)",
                        nullptr,
                        library_search_path,
-                       // TODO (dimitry): change to isolated eventually.
-                       ANDROID_NAMESPACE_TYPE_REGULAR,
+                       ANDROID_NAMESPACE_TYPE_ISOLATED,
                        nullptr,
                        &g_default_namespace);
 
@@ -3367,21 +3382,9 @@ bool soinfo::protect_relro() {
   return true;
 }
 
-void init_default_namespace() {
-  g_default_namespace.set_name("(default)");
+static void init_default_namespace_no_config(bool is_asan) {
   g_default_namespace.set_isolated(false);
-
-  soinfo* somain = solist_get_somain();
-
-  const char *interp = phdr_table_get_interpreter_name(somain->phdr, somain->phnum,
-                                                       somain->load_bias);
-  const char* bname = basename(interp);
-
-  bool is_asan = bname != nullptr &&
-                 (strcmp(bname, "linker_asan") == 0 ||
-                  strcmp(bname, "linker_asan64") == 0);
   auto default_ld_paths = is_asan ? kAsanDefaultLdPaths : kDefaultLdPaths;
-  g_is_asan = is_asan;
 
   char real_path[PATH_MAX];
   std::vector<std::string> ld_default_paths;
@@ -3394,4 +3397,91 @@ void init_default_namespace() {
   }
 
   g_default_namespace.set_default_library_paths(std::move(ld_default_paths));
-};
+}
+
+void init_default_namespace(const char* executable_path) {
+  g_default_namespace.set_name("(default)");
+
+  soinfo* somain = solist_get_somain();
+
+  const char *interp = phdr_table_get_interpreter_name(somain->phdr, somain->phnum,
+                                                       somain->load_bias);
+  const char* bname = basename(interp);
+
+  g_is_asan = bname != nullptr &&
+              (strcmp(bname, "linker_asan") == 0 ||
+               strcmp(bname, "linker_asan64") == 0);
+
+  const Config* config = nullptr;
+
+  std::string error_msg;
+
+  if (!Config::read_binary_config(kLdConfigFilePath,
+                                  executable_path,
+                                  g_is_asan,
+                                  &config,
+                                  &error_msg)) {
+    if (!error_msg.empty()) {
+      DL_WARN("error reading config file \"%s\" for \"%s\" (will use default configuration): %s",
+              kLdConfigFilePath,
+              executable_path,
+              error_msg.c_str());
+    }
+    config = nullptr;
+  }
+
+  if (config == nullptr) {
+    init_default_namespace_no_config(g_is_asan);
+    return;
+  }
+
+  const auto& namespace_configs = config->namespace_configs();
+  std::unordered_map<std::string, android_namespace_t*> namespaces;
+
+  // 1. Initialize default namespace
+  const NamespaceConfig* default_ns_config = config->default_namespace_config();
+
+  g_default_namespace.set_isolated(default_ns_config->isolated());
+  g_default_namespace.set_default_library_paths(default_ns_config->search_paths());
+  g_default_namespace.set_permitted_paths(default_ns_config->permitted_paths());
+
+  namespaces[default_ns_config->name()] = &g_default_namespace;
+
+  // 2. Initialize other namespaces
+
+  for (auto& ns_config : namespace_configs) {
+    if (namespaces.find(ns_config->name()) != namespaces.end()) {
+      continue;
+    }
+
+    android_namespace_t* ns = new (g_namespace_allocator.alloc()) android_namespace_t();
+    ns->set_name(ns_config->name());
+    ns->set_isolated(ns_config->isolated());
+    ns->set_default_library_paths(ns_config->search_paths());
+    ns->set_permitted_paths(ns_config->permitted_paths());
+
+    namespaces[ns_config->name()] = ns;
+  }
+
+  // 3. Establish links between namespaces
+  for (auto& ns_config : namespace_configs) {
+    auto it_from = namespaces.find(ns_config->name());
+    CHECK(it_from != namespaces.end());
+    android_namespace_t* namespace_from = it_from->second;
+    for (const NamespaceLinkConfig& ns_link : ns_config->links()) {
+      auto it_to = namespaces.find(ns_link.ns_name());
+      CHECK(it_to != namespaces.end());
+      android_namespace_t* namespace_to = it_to->second;
+      link_namespaces(namespace_from, namespace_to, ns_link.shared_libs().c_str());
+    }
+  }
+  // we can no longer rely on the fact that libdl.so is part of default namespace
+  // this is why we want to add ld-android.so to all namespaces from ld.config.txt
+  soinfo* ld_android_so = solist_get_head();
+  for (auto it : namespaces) {
+    it.second->add_soinfo(ld_android_so);
+    // TODO (dimitry): somain and ld_preloads should probably be added to all of these namespaces too?
+  }
+
+  set_application_target_sdk_version(config->target_sdk_version());
+}

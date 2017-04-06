@@ -19,6 +19,7 @@ cc_binary {
         "linker_block_allocator.cpp",
         "linker_dlwarning.cpp",
         "linker_cfi.cpp",
+        "linker_config.cpp",
         "linker_gdb_support.cpp",
         "linker_globals.cpp",
         "linker_libc_support.c",
@@ -39,35 +40,29 @@ cc_binary {
             srcs: ["arch/arm/begin.S"],
 
             cflags: ["-D__work_around_b_24465209__"],
-            ldflags: ["-Wl,-dynamic-linker,/system/bin/linker"],
         },
         arm64: {
             srcs: ["arch/arm64/begin.S"],
-            ldflags: ["-Wl,-dynamic-linker,/system/bin/linker64"],
         },
         x86: {
             srcs: ["arch/x86/begin.c"],
 
             cflags: ["-D__work_around_b_24465209__"],
-            ldflags: ["-Wl,-dynamic-linker,/system/bin/linker"],
         },
         x86_64: {
             srcs: ["arch/x86_64/begin.S"],
-            ldflags: ["-Wl,-dynamic-linker,/system/bin/linker64"],
         },
         mips: {
             srcs: [
                 "arch/mips/begin.S",
                 "linker_mips.cpp",
             ],
-            ldflags: ["-Wl,-dynamic-linker,/system/bin/linker"],
         },
         mips64: {
             srcs: [
                 "arch/mips64/begin.S",
                 "linker_mips.cpp",
             ],
-            ldflags: ["-Wl,-dynamic-linker,/system/bin/linker64"],
         },
     },
 
