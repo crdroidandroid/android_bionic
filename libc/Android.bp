@@ -550,6 +550,7 @@ cc_library_static {
                 "upstream-openbsd/lib/libc/string/strcpy.c",
                 "upstream-openbsd/lib/libc/string/stpcpy.c",
                 "upstream-openbsd/lib/libc/string/strcat.c",
+                "upstream-openbsd/lib/libc/string/memchr.c",
             ],
         },
         arm64: {
@@ -751,6 +752,7 @@ cc_library_static {
     arch: {
         arm: {
             srcs: [
+                "arch-arm/generic/bionic/memchr.S",
                 "arch-arm/generic/bionic/memcmp.S",
                 "arch-arm/generic/bionic/memmove.S",
                 "arch-arm/generic/bionic/memset.S",
