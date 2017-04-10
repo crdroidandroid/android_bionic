@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2016 The Android Open Source Project
+ * Copyright (C) 2017 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,40 +26,44 @@
  * SUCH DAMAGE.
  */
 
-#ifndef _LINKER_LOGGER_H_
-#define _LINKER_LOGGER_H_
+#include <android/set_abort_message.h>
 
-#include <stdlib.h>
-#include <limits.h>
-#include "private/bionic_macros.h"
-#include "private/bionic_systrace.h"
+#include <pthread.h>
+#include <sys/mman.h>
 
-#define LD_LOG(type, x...) \
-  { \
-    g_linker_logger.Log(type, x); \
-  }
+#include "private/ScopedPthreadMutexLocker.h"
 
-constexpr const uint32_t kLogErrors = 1 << 0;
-constexpr const uint32_t kLogDlopen = 1 << 1;
-constexpr const uint32_t kLogDlsym  = 1 << 2;
+static pthread_mutex_t g_abort_msg_lock = PTHREAD_MUTEX_INITIALIZER;
 
-class LinkerLogger {
- public:
-  LinkerLogger() : flags_(0) { }
-
-  void ResetState();
-  void Log(uint32_t type, const char* format, ...);
- private:
-  uint32_t flags_;
-
-  DISALLOW_COPY_AND_ASSIGN(LinkerLogger);
+struct abort_msg_t {
+  size_t size;
+  char msg[0];
 };
 
-extern LinkerLogger g_linker_logger;
-extern char** g_argv;
+abort_msg_t** __abort_message_ptr; // Accessible to __libc_init_common.
 
-// If the system property debug.ld.greylist_disabled is true, we'll not use the greylist
-// regardless of API level.
-extern bool g_greylist_disabled;
+void android_set_abort_message(const char* msg) {
+  ScopedPthreadMutexLocker locker(&g_abort_msg_lock);
 
-#endif /* _LINKER_LOGGER_H_ */
+  if (__abort_message_ptr == nullptr) {
+    // We must have crashed _very_ early.
+    return;
+  }
+
+  if (*__abort_message_ptr != nullptr) {
+    // We already have an abort message.
+    // Assume that the first crash is the one most worth reporting.
+    return;
+  }
+
+  size_t size = sizeof(abort_msg_t) + strlen(msg) + 1;
+  void* map = mmap(nullptr, size, PROT_READ | PROT_WRITE, MAP_ANON | MAP_PRIVATE, -1, 0);
+  if (map == MAP_FAILED) {
+    return;
+  }
+
+  abort_msg_t* new_abort_message = reinterpret_cast<abort_msg_t*>(map);
+  new_abort_message->size = size;
+  strcpy(new_abort_message->msg, msg);
+  *__abort_message_ptr = new_abort_message;
+}
