@@ -2040,15 +2040,12 @@ cc_object {
     defaults: ["crt_defaults"],
 }
 
-// The following module lives in prebuilts/ndk because we need to preprocess the
-// headers to include ifdef guards for __ANDROID_API__. Update with
-// bionic/tools/update_headers.sh.
-// ndk_headers {
-//     name: "common_libc",
-//     from: "include",
-//     to: "",
-//     srcs: ["include/**/*.h"],
-// }
+preprocessed_ndk_headers {
+    name: "common_libc",
+    from: "include",
+    to: "",
+    license: "NOTICE",
+}
 
 ndk_headers {
     name: "libc_uapi",
@@ -2177,6 +2174,63 @@ ndk_library {
     name: "libc.ndk",
     symbol_file: "libc.map.txt",
     first_version: "9",
+}
+
+llndk_library {
+    name: "libc.llndk",
+    symbol_file: "libc.map.txt",
+    export_headers_as_system: true,
+    export_preprocessed_headers: ["include"],
+    arch: {
+        arm: {
+            export_include_dirs: [
+                "arch-arm/include",
+                "kernel/uapi",
+                "kernel/uapi/asm-arm",
+                "kernel/android/uapi",
+            ],
+        },
+        arm64: {
+            export_include_dirs: [
+                "arch-arm64/include",
+                "kernel/uapi",
+                "kernel/uapi/asm-arm64",
+                "kernel/android/uapi",
+            ],
+        },
+        mips: {
+            export_include_dirs: [
+                "arch-mips/include",
+                "kernel/uapi",
+                "kernel/uapi/asm-mips",
+                "kernel/android/uapi",
+            ],
+        },
+        mips64: {
+            export_include_dirs: [
+                "arch-mips64/include",
+                "kernel/uapi",
+                "kernel/uapi/asm-mips",
+                "kernel/android/uapi",
+            ],
+        },
+        x86: {
+            export_include_dirs: [
+                "arch-x86/include",
+                "kernel/uapi",
+                "kernel/uapi/asm-x86",
+                "kernel/android/uapi",
+            ],
+        },
+        x86_64: {
+            export_include_dirs: [
+                "arch-x86_64/include",
+                "kernel/uapi",
+                "kernel/uapi/asm-x86",
+                "kernel/android/uapi",
+            ],
+        },
+    },
 }
 
 ndk_library {
