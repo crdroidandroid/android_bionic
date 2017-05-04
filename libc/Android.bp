@@ -812,6 +812,7 @@ cc_library_static {
                 "arch-arm64/generic/bionic/memset.S",
                 "arch-arm64/generic/bionic/stpcpy.S",
                 "arch-arm64/generic/bionic/strchr.S",
+                "arch-arm64/generic/bionic/strrchr.S",
                 "arch-arm64/generic/bionic/strcmp.S",
                 "arch-arm64/generic/bionic/strcpy.S",
                 "arch-arm64/generic/bionic/strlen.S",
@@ -829,6 +830,7 @@ cc_library_static {
                 "bionic/__memcpy_chk.cpp",
                 "bionic/strchr.cpp",
                 "bionic/strnlen.c",
+                "bionic/strrchr.cpp",
             ],
         },
 
