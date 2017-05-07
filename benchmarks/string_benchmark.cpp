@@ -86,6 +86,23 @@ static void BM_string_memset(benchmark::State& state) {
 }
 BENCHMARK(BM_string_memset)->AT_COMMON_SIZES;
 
+static void BM_string_strcmp(benchmark::State& state) {
+  const size_t nbytes = state.range(0);
+  char* src = new char[nbytes]; char* dst = new char[nbytes];
+  memset(src, 'x', nbytes);
+  memset(dst, 'x', nbytes);
+
+  volatile int c __attribute__((unused)) = 0;
+  while (state.KeepRunning()) {
+    c += strcmp(dst, src);
+  }
+
+  state.SetBytesProcessed(uint64_t(state.iterations()) * uint64_t(nbytes));
+  delete[] src;
+  delete[] dst;
+}
+BENCHMARK(BM_string_strcmp)->AT_COMMON_SIZES;
+
 static void BM_string_strlen(benchmark::State& state) {
   const size_t nbytes = state.range_x();
   char* s = new char[nbytes];
