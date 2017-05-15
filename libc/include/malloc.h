@@ -70,6 +70,11 @@ extern struct mallinfo mallinfo(void);
  */
 extern int malloc_info(int, FILE *);
 
+/* mallopt options */
+#define M_DECAY_TIME -100
+
+int mallopt(int, int) __INTRODUCED_IN(26);
+
 __END_DECLS
 
 #endif  /* LIBC_INCLUDE_MALLOC_H_ */
