@@ -36,6 +36,7 @@
 #include <string.h>
 #include <sys/mman.h>
 #include <sys/param.h>
+#include <sys/vfs.h>
 #include <unistd.h>
 
 #include <new>
@@ -1078,7 +1079,7 @@ static int open_library(android_namespace_t* ns,
   }
 
   // TODO(dimitry): workaround for http://b/26394120 (the grey-list)
-  if (fd == -1 && ns != &g_default_namespace && is_greylisted(ns, name, needed_by)) {
+  if (fd == -1 && ns->is_greylist_enabled() && is_greylisted(ns, name, needed_by)) {
     // try searching for it on default_namespace default_library_path
     fd = open_library_on_paths(zip_archive_cache, name, file_offset,
                                g_default_namespace.get_default_library_paths(), realpath);
@@ -1191,7 +1192,15 @@ static bool load_library(android_namespace_t* ns,
     return false;
   }
 
-  if (!ns->is_accessible(realpath)) {
+  struct statfs fs_stat;
+  if (TEMP_FAILURE_RETRY(fstatfs(task->get_fd(), &fs_stat)) != 0) {
+    DL_ERR("unable to fstatfs file for the library \"%s\": %s", name, strerror(errno));
+    return false;
+  }
+
+  // do not check accessibility using realpath if fd is located on tmpfs
+  // this enables use of memfd_create() for apps
+  if ((fs_stat.f_type != TMPFS_MAGIC) && (!ns->is_accessible(realpath))) {
     // TODO(dimitry): workaround for http://b/26394120 - the grey-list
 
     // TODO(dimitry) before O release: add a namespace attribute to have this enabled
@@ -1766,6 +1775,9 @@ static void soinfo_unload(soinfo* soinfos[], size_t count) {
         if (local_unload_list.contains(child)) {
           continue;
         } else if (child->is_linked() && child->get_local_group_root() != root) {
+          child->get_parents().remove_if([&] (const soinfo* parent) {
+            return parent == si;
+          });
           external_unload_list.push_back(child);
         } else if (child->get_parents().empty()) {
           unload_list.push_back(child);
@@ -2176,17 +2188,36 @@ android_namespace_t* create_namespace(const void* caller_addr,
   android_namespace_t* ns = new (g_namespace_allocator.alloc()) android_namespace_t();
   ns->set_name(name);
   ns->set_isolated((type & ANDROID_NAMESPACE_TYPE_ISOLATED) != 0);
-  ns->set_ld_library_paths(std::move(ld_library_paths));
-  ns->set_default_library_paths(std::move(default_library_paths));
-  ns->set_permitted_paths(std::move(permitted_paths));
+  ns->set_greylist_enabled((type & ANDROID_NAMESPACE_TYPE_GREYLIST_ENABLED) != 0);
 
   if ((type & ANDROID_NAMESPACE_TYPE_SHARED) != 0) {
+    // append parent namespace paths.
+    std::copy(parent_namespace->get_ld_library_paths().begin(),
+              parent_namespace->get_ld_library_paths().end(),
+              back_inserter(ld_library_paths));
+
+    std::copy(parent_namespace->get_default_library_paths().begin(),
+              parent_namespace->get_default_library_paths().end(),
+              back_inserter(default_library_paths));
+
+    std::copy(parent_namespace->get_permitted_paths().begin(),
+              parent_namespace->get_permitted_paths().end(),
+              back_inserter(permitted_paths));
+
     // If shared - clone the parent namespace
     add_soinfos_to_namespace(parent_namespace->soinfo_list(), ns);
+    // and copy parent namespace links
+    for (auto& link : parent_namespace->linked_namespaces()) {
+      ns->add_linked_namespace(link.linked_namespace(), link.shared_lib_sonames());
+    }
   } else {
     // If not shared - copy only the shared group
     add_soinfos_to_namespace(get_shared_group(parent_namespace), ns);
   }
+
+  ns->set_ld_library_paths(std::move(ld_library_paths));
+  ns->set_default_library_paths(std::move(default_library_paths));
+  ns->set_permitted_paths(std::move(permitted_paths));
 
   return ns;
 }
