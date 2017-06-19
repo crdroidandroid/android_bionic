@@ -1281,6 +1281,7 @@ LIBC_O {
     getsubopt; # future
     hasmntopt; # future
     lutimes; # future
+    mallopt; # future
     mblen; # future
     msgctl; # future
     msgget; # future
@@ -1553,5 +1554,4 @@ LIBC_PLATFORM {
     malloc_disable;
     malloc_enable;
     malloc_iterate;
-    mallopt;
 } LIBC_O;
