@@ -42,6 +42,10 @@
 #include <bits/seek_constants.h>
 #include <bits/sysconf.h>
 
+#ifdef USE_WRAPPER
+#include "codeaurora/PropClientDispatchWrite.h"
+#endif
+
 __BEGIN_DECLS
 
 #define STDIN_FILENO	0
@@ -671,6 +675,11 @@ ssize_t read(int fd, void* buf, size_t count) {
 __BIONIC_FORTIFY_INLINE
 ssize_t write(int fd, const void* buf, size_t count) {
     size_t bos = __bos0(buf);
+    #ifdef USE_WRAPPER
+      if( __propClientDispatchWrite.propWrite ) {
+          __propClientDispatchWrite.propWrite(fd);
+      }
+    #endif
 
     if (bos == __BIONIC_FORTIFY_UNKNOWN_SIZE) {
         return __write_real(fd, buf, count);

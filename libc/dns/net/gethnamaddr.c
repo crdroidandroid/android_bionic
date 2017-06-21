@@ -75,6 +75,10 @@
 #include <syslog.h>
 #include <unistd.h>
 
+#ifdef USE_WRAPPER
+#include "codeaurora/PropClientDispatch.h"
+#endif
+
 #define ALIGNBYTES (sizeof(uintptr_t) - 1)
 #define ALIGN(p) (((uintptr_t)(p) + ALIGNBYTES) &~ ALIGNBYTES)
 
@@ -816,6 +820,16 @@ static struct hostent *
 gethostbyname_internal(const char *name, int af, res_state res, struct hostent *hp, char *hbuf,
                        size_t hbuflen, int *errorp, unsigned netid, unsigned mark)
 {
+#ifdef USE_WRAPPER
+        const char* cache_mode = getenv("ANDROID_DNS_MODE");
+        bool use_proxy = (cache_mode == NULL || strcmp(cache_mode, "local") != 0);
+        if (use_proxy) {
+            if(__propClientDispatch.propGetHostByNameForNet) {
+               __propClientDispatch.propGetHostByNameForNet(getpid(), getuid(), getgid(), name);
+            }
+        }
+#endif
+
 	FILE* proxy = android_open_proxy();
 	if (proxy == NULL) {
 		// Either we're not supposed to be using the proxy or the proxy is unavailable.
@@ -924,6 +938,16 @@ android_gethostbyaddrfornet_proxy_internal(const void* addr, socklen_t len, int 
                              struct hostent *hp, char *hbuf, size_t hbuflen, int *he,
                              unsigned netid, unsigned mark)
 {
+#ifdef USE_WRAPPER
+        const char* cache_mode = getenv("ANDROID_DNS_MODE");
+        bool use_proxy = (cache_mode == NULL || strcmp(cache_mode, "local") != 0);
+        if (use_proxy) {
+            if(__propClientDispatch.propGetHostByAddrForNet) {
+               __propClientDispatch.propGetHostByAddrForNet(getpid(), getuid(), getgid(), addr);
+            }
+        }
+#endif
+
 	FILE* proxy = android_open_proxy();
 	if (proxy == NULL) {
 		// Either we're not supposed to be using the proxy or the proxy is unavailable.
