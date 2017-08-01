@@ -44,8 +44,10 @@
 static void EnableToggle(int, siginfo_t*, void*) {
   if (g_debug->backtrace->enabled()) {
     g_debug->backtrace->set_enabled(false);
+    info_log("%s:%d backtrace disabled.", getprogname(), getpid());
   } else {
     g_debug->backtrace->set_enabled(true);
+    info_log("%s:%d backtrace enabled.", getprogname(), getpid());
   }
 }
 
