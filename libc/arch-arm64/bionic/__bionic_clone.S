@@ -31,9 +31,6 @@
 // pid_t __bionic_clone(int flags, void* child_stack, pid_t* parent_tid, void* tls, pid_t* child_tid, int (*fn)(void*), void* arg);
 
 ENTRY_PRIVATE(__bionic_clone)
-    # Push 'fn' and 'arg' onto the child stack.
-    stp     x5, x6, [x1, #-16]!
-
     # Make the system call.
     mov     x8, __NR_clone
     svc     #0
@@ -53,7 +50,8 @@ ENTRY_PRIVATE(__bionic_clone)
     mov     x29, #0
     # Setting x30 to 0 will make the unwinder stop at __start_thread.
     mov     x30, #0
-    # Call __start_thread with the 'fn' and 'arg' we stored on the child stack.
-    ldp     x0, x1, [sp], #16
+    # Call __start_thread with the 'fn' and 'arg' parameters.
+    mov     x0, x5
+    mov     x1, x6
     b       __start_thread
 END(__bionic_clone)
