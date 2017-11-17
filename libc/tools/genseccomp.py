@@ -64,11 +64,31 @@ def get_names(syscall_files, architecture):
   return list(set(names))
 
 
+def find_clang():
+  globals = open("../../build/soong/cc/config/global.go").readlines()
+  bases = [i for i in globals if i.lstrip().startswith("ClangDefaultBase")]
+  if len(bases) != 1:
+    raise RuntimeError("Can't find clang path in global.go")
+
+  versions = [i for i in globals if i.lstrip().startswith("ClangDefaultVersion")]
+  if len(versions) != 1:
+    raise RuntimeError("Can't find clang version in global.go")
+
+  base = bases[0].split(" ")[-1].rstrip().strip('"')
+  version = versions[0].split(" ")[-1].rstrip().strip('"')
+
+  clang_path = "../../" + base + "/linux-x86/" + version + "/bin/clang"
+  if not os.path.isfile(clang_path):
+    raise RuntimeError("Cannot find clang at " + clang_path)
+
+  return clang_path
+
+
 def convert_names_to_NRs(names, header_dir, extra_switches):
   # Run preprocessor over the __NR_syscall symbols, including unistd.h,
   # to get the actual numbers
   prefix = "__SECCOMP_"  # prefix to ensure no name collisions
-  cpp = Popen(["../../prebuilts/clang/host/linux-x86/clang-stable/bin/clang",
+  cpp = Popen([find_clang(),
                "-E", "-nostdinc", "-I" + header_dir, "-Ikernel/uapi/"]
                + extra_switches
                + ["-"],
