@@ -47,15 +47,21 @@ long double fabsl(long double x) {
 }
 #endif
 
-#if defined(__aarch64__)
+// fma has builtin routines for ARMv7-A NEON, ARMv8, and ARM64
+
+#if defined (__ARM_NEON__) || defined (__aarch64__)
+float fmaf(float x, float y, float z) { return __builtin_fmaf(x, y, z); }
+double fma(double x, double y, double z) { return __builtin_fma(x, y, z); }
+#endif
+
+// ceil/floor/fmax/fmin/nearbyint/rint/round/trunc have builtin routines for ARMv8 and ARM64
+
+#if defined (__AARCH32__) || defined (__aarch64__)
 float ceilf(float x) { return __builtin_ceilf(x); }
 double ceil(double x) { return __builtin_ceil(x); }
 
 float floorf(float x) { return __builtin_floorf(x); }
 double floor(double x) { return __builtin_floor(x); }
-
-float fmaf(float x, float y, float z) { return __builtin_fmaf(x, y, z); }
-double fma(double x, double y, double z) { return __builtin_fma(x, y, z); }
 
 float fmaxf(float x, float y) { return __builtin_fmaxf(x, y); }
 double fmax(double x, double y) { return __builtin_fmax(x, y); }
@@ -66,6 +72,17 @@ double fmin(double x, double y) { return __builtin_fmin(x, y); }
 float nearbyintf(float x) { return __builtin_nearbyintf(x); }
 double nearbyint(double x) { return __builtin_nearbyint(x); }
 
+float rintf(float x) { return __builtin_rintf(x); }
+double rint(double x) { return __builtin_rint(x); }
+
+float roundf(float x) { return __builtin_roundf(x); }
+double round(double x) { return __builtin_round(x); }
+
+float truncf(float x) { return __builtin_truncf(x); }
+double trunc(double x) { return __builtin_trunc(x); }
+#endif
+
+#if defined (__aarch64__)
 // msun s_nearbyint.c defines all floating-point version, so we need to
 // redefine the long double one here. For aarch64, clang/compiler-rt
 // soft-float routines does not use single/double floating-point operation,
@@ -78,13 +95,4 @@ long double nearbyintl(long double x) {
     fesetenv(&env);
     return (ret);
 }
-
-float rintf(float x) { return __builtin_rintf(x); }
-double rint(double x) { return __builtin_rint(x); }
-
-float roundf(float x) { return __builtin_roundf(x); }
-double round(double x) { return __builtin_round(x); }
-
-float truncf(float x) { return __builtin_truncf(x); }
-double trunc(double x) { return __builtin_trunc(x); }
 #endif
