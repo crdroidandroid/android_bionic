@@ -288,7 +288,7 @@ cc_library {
             srcs: [
                 "arm/fenv.c",
             ],
-            neon: {
+            armv7_a_neon: {
                 srcs: [
                     "arm/sqrt.S",
                     "arm/floor.S",
@@ -298,7 +298,38 @@ cc_library {
                     "upstream-freebsd/lib/msun/src/e_sqrt.c",
                     "upstream-freebsd/lib/msun/src/e_sqrtf.c",
                     "upstream-freebsd/lib/msun/src/s_floor.c",
+                    "upstream-freebsd/lib/msun/src/s_fma.c",
+                    "upstream-freebsd/lib/msun/src/s_fmaf.c",
                 ],
+            },
+            aarch32: {
+                srcs: [
+                    "arm/sqrt.S",
+                ],
+                exclude_srcs: [
+                    "upstream-freebsd/lib/msun/src/e_sqrt.c",
+                    "upstream-freebsd/lib/msun/src/e_sqrtf.c",
+                    "upstream-freebsd/lib/msun/src/s_ceil.c",
+                    "upstream-freebsd/lib/msun/src/s_ceilf.c",
+                    "upstream-freebsd/lib/msun/src/s_floor.c",
+                    "upstream-freebsd/lib/msun/src/s_floorf.c",
+                    "upstream-freebsd/lib/msun/src/s_fma.c",
+                    "upstream-freebsd/lib/msun/src/s_fmaf.c",
+                    "upstream-freebsd/lib/msun/src/s_fmax.c",
+                    "upstream-freebsd/lib/msun/src/s_fmaxf.c",
+                    "upstream-freebsd/lib/msun/src/s_fmin.c",
+                    "upstream-freebsd/lib/msun/src/s_fminf.c",
+                    "upstream-freebsd/lib/msun/src/s_nearbyintf.c",
+                    "upstream-freebsd/lib/msun/src/s_nearbyint.c",
+                    "upstream-freebsd/lib/msun/src/s_rint.c",
+                    "upstream-freebsd/lib/msun/src/s_rintf.c",
+                    "upstream-freebsd/lib/msun/src/s_round.c",
+                    "upstream-freebsd/lib/msun/src/s_roundf.c",
+                    "upstream-freebsd/lib/msun/src/s_trunc.c",
+                    "upstream-freebsd/lib/msun/src/s_truncf.c",
+                ],
+                cflags: ["-D__AARCH32__"],
+                cppflags: ["-D__AARCH32__"],
             },
             instruction_set: "arm",
             pack_relocations: false,
