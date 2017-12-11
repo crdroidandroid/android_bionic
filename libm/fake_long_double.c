@@ -44,3 +44,18 @@ void sincosl(long double x, long double* s, long double* c) { sincos(x, (double*
 
 // FreeBSD doesn't have an ld128 implementation of tgammal, so both LP32 and LP64 need this.
 long double tgammal(long double x) { return tgamma(x); }
+
+// builtins.cpp does not provide the long double wrappers for the
+// routines it implements.
+
+#if defined (__ARM_NEON__)
+long double fmal(long double a1, long double a2, long double a3) { return fma(a1, a2, a3); }
+#endif
+
+#if defined (__AARCH32__)
+long double ceill(long double x) { return ceil(x); }
+long double floorl(long double x) { return floor(x); }
+long double nearbyintl(long double x) { return nearbyint(x); }
+long double rintl(long double x) { return rint(x); }
+long double truncl(long double x) { return trunc(x); }
+#endif
