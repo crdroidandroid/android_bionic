@@ -1525,7 +1525,10 @@ cc_library_static {
             cflags: ["-D__ANDROID_TREBLE__"],
         },
     },
-    cppflags: ["-Wold-style-cast"],
+    cppflags: [
+        "-Wold-style-cast",
+        "-Wno-tautological-type-limit-compare",
+    ],
     local_include_dirs: ["stdio"],
     include_dirs: ["bionic/libstdc++/include"],
     name: "libc_bionic_ndk",
