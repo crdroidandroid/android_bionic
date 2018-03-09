@@ -80,6 +80,10 @@ cc_binary {
         "-Wl,--exclude-libs,ALL",
     ],
 
+    // Cannot link with lld: arm
+    // Cannot boot with lld: x86_64, arm64
+    use_clang_lld: false,
+
     cflags: [
         "-fno-stack-protector",
         "-Wstrict-overflow=5",
