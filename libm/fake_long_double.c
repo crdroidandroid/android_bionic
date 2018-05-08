@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <complex.h>
 #include <float.h>
 #include <math.h>
 
@@ -24,6 +25,7 @@
 // that call the regular "double" function.
 
 long double copysignl(long double a1, long double a2) { return copysign(a1, a2); }
+long double complex csqrtl(long double complex z) { return csqrt(z); }
 long double fmaxl(long double a1, long double a2) { return fmax(a1, a2); }
 long double fmodl(long double a1, long double a2) { return fmod(a1, a2); }
 long double fminl(long double a1, long double a2) { return fmin(a1, a2); }
