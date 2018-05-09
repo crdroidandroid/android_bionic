@@ -70,10 +70,6 @@
 #include "android-base/stringprintf.h"
 #include "ziparchive/zip_archive.h"
 
-// Override macros to use C++ style casts.
-#undef ELF_ST_TYPE
-#define ELF_ST_TYPE(x) (static_cast<uint32_t>(x) & 0xf)
-
 static android_namespace_t* g_anonymous_namespace = &g_default_namespace;
 static std::unordered_map<std::string, android_namespace_t*> g_exported_namespaces;
 
