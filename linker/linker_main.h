@@ -72,6 +72,7 @@ void solist_add_soinfo(soinfo* si);
 bool solist_remove_soinfo(soinfo* si);
 soinfo* solist_get_head();
 soinfo* solist_get_somain();
+soinfo* solist_get_vdso();
 
 const char* get_executable_path();
 
