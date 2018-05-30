@@ -49,7 +49,6 @@ cc_library {
         "upstream-freebsd/lib/msun/src/e_log2.c",
         "upstream-freebsd/lib/msun/src/e_log.c",
         "upstream-freebsd/lib/msun/src/e_pow.c",
-        "upstream-freebsd/lib/msun/src/e_powf.c",
         "upstream-freebsd/lib/msun/src/e_remainder.c",
         "upstream-freebsd/lib/msun/src/e_remainderf.c",
         "upstream-freebsd/lib/msun/src/e_rem_pio2.c",
@@ -215,6 +214,8 @@ cc_library {
         "optimized-routines/logf_data.c",
         "optimized-routines/log2f_data.c",
         "optimized-routines/math_errf.c",
+        "optimized-routines/powf.c",
+        "optimized-routines/powf_log2_data.c",
     ],
 
     multilib: {
