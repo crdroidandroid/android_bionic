@@ -92,7 +92,6 @@ cc_library {
         "upstream-freebsd/lib/msun/src/s_copysign.c",
         "upstream-freebsd/lib/msun/src/s_copysignf.c",
         "upstream-freebsd/lib/msun/src/s_cos.c",
-        "upstream-freebsd/lib/msun/src/s_cosf.c",
         "upstream-freebsd/lib/msun/src/s_cproj.c",
         "upstream-freebsd/lib/msun/src/s_cprojf.c",
         "upstream-freebsd/lib/msun/src/s_cprojl.c",
@@ -157,8 +156,6 @@ cc_library {
         "upstream-freebsd/lib/msun/src/s_significandf.c",
         "upstream-freebsd/lib/msun/src/s_sin.c",
         "upstream-freebsd/lib/msun/src/s_sincos.c",
-        "upstream-freebsd/lib/msun/src/s_sincosf.c",
-        "upstream-freebsd/lib/msun/src/s_sinf.c",
         "upstream-freebsd/lib/msun/src/s_tan.c",
         "upstream-freebsd/lib/msun/src/s_tanf.c",
         "upstream-freebsd/lib/msun/src/s_tanh.c",
@@ -206,6 +203,7 @@ cc_library {
         "builtins.cpp",
 
         // Optimized math implementations.
+        "optimized-routines/cosf.c",
         "optimized-routines/expf.c",
         "optimized-routines/exp2f.c",
         "optimized-routines/exp2f_data.c",
@@ -216,6 +214,9 @@ cc_library {
         "optimized-routines/math_errf.c",
         "optimized-routines/powf.c",
         "optimized-routines/powf_log2_data.c",
+        "optimized-routines/sinf.c",
+        "optimized-routines/sincosf.c",
+        "optimized-routines/sincosf_data.c",
     ],
 
     multilib: {
