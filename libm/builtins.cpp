@@ -15,6 +15,7 @@
  */
 
 #include <math.h>
+#include <fenv.h>
 
 #include "fpmath.h"
 
@@ -57,4 +58,17 @@ double fmin(double x, double y) { return __builtin_fmin(x, y); }
 
 float roundf(float x) { return __builtin_roundf(x); }
 double round(double x) { return __builtin_round(x); }
+
+float nearbyintf(float x) { return __builtin_nearbyintf (x); }
+double nearbyint(double x) { return __builtin_nearbyint (x); }
+/* msun s_nearbyint.c defines all floating-point version, so we need to
+   redefine the long double one here.  */
+long double nearbyintl(long double x)
+{
+  fenv_t env;
+  fegetenv(&env);
+  long double ret = rintl(x);
+  fesetenv(&env);
+  return ret;
+}
 #endif
