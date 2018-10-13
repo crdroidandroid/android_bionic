@@ -41,6 +41,7 @@ libc_common_flags = [
     "-Wno-deprecated-declarations",
     "-Wno-gcc-compat",
     "-Wframe-larger-than=2048",
+    "-O3",
 
     // Try to catch typical 32-bit assumptions that break with 64-bit pointers.
     "-Werror=pointer-to-int-cast",
@@ -122,14 +123,14 @@ cc_library_static {
     name: "libc_init_static",
     defaults: ["libc_defaults"],
     srcs: ["bionic/libc_init_static.cpp"],
-    cflags: ["-fno-stack-protector"],
+    cflags: ["-fno-stack-protector","-O3"],
 }
 
 cc_library_static {
     name: "libc_init_dynamic",
     defaults: ["libc_defaults"],
     srcs: ["bionic/libc_init_dynamic.cpp"],
-    cflags: ["-fno-stack-protector"],
+    cflags: ["-fno-stack-protector","-O3"],
 }
 
 // ========================================================
@@ -165,6 +166,7 @@ cc_library_static {
         "-DWILDABBR=\"\"",
         "-DNO_RUN_TIME_WARNINGS_ABOUT_YEAR_2000_PROBLEMS_THANK_YOU",
         "-Dlint",
+        "-O3",
     ],
 
     local_include_dirs: ["tzcode/"],
@@ -288,6 +290,7 @@ cc_library_static {
         "-Wno-uninitialized",
         "-Wno-unused-parameter",
         "-include freebsd-compat.h",
+        "-O3",
     ],
 
     local_include_dirs: [
@@ -308,6 +311,7 @@ cc_library_static {
         "-Wno-sign-compare",
         "-include freebsd-compat.h",
         "-Wframe-larger-than=66000",
+        "-O3",
     ],
 
     local_include_dirs: [
@@ -372,6 +376,7 @@ cc_library_static {
         "-Wno-unused-parameter",
         "-DPOSIX_MISTAKE",
         "-include netbsd-compat.h",
+        "-O3",
     ],
 
     local_include_dirs: [
@@ -502,6 +507,7 @@ cc_library_static {
         "-Wno-uninitialized",
         "-Wno-unused-parameter",
         "-include openbsd-compat.h",
+        "-O3",
     ],
 
     local_include_dirs: [
@@ -524,6 +530,7 @@ cc_library_static {
         "-include openbsd-compat.h",
         "-Wno-sign-compare",
         "-Wframe-larger-than=5000",
+        "-O3",
     ],
 
     local_include_dirs: [
@@ -640,6 +647,7 @@ cc_library_static {
         "-Wno-uninitialized",
         "-Wno-unused-parameter",
         "-include openbsd-compat.h",
+        "-O3",
     ],
 
     local_include_dirs: [
@@ -689,6 +697,7 @@ cc_library_static {
         "-Wno-sign-compare",
         "-Wno-uninitialized",
         "-include openbsd-compat.h",
+        "-O3",
     ],
 
     local_include_dirs: [
@@ -715,6 +724,7 @@ cc_library_static {
     cflags: [
         "-U_FORTIFY_SOURCE",
         "-D__BIONIC_DECLARE_FORTIFY_HELPERS",
+        "-O3",
     ],
 
     arch: {
@@ -1291,7 +1301,7 @@ cc_library_static {
         },
     },
 
-    cppflags: ["-Wold-style-cast"],
+    cppflags: ["-Wold-style-cast","-O3"],
     include_dirs: ["bionic/libstdc++/include"],
     name: "libc_bionic",
 }
@@ -1492,7 +1502,7 @@ cc_library_static {
         },
     },
     whole_static_libs: ["libsystemproperties"],
-    cppflags: ["-Wold-style-cast"],
+    cppflags: ["-Wold-style-cast","-O3"],
     local_include_dirs: ["stdio"],
     include_dirs: ["bionic/libstdc++/include"],
     name: "libc_bionic_ndk",
@@ -1552,6 +1562,7 @@ cc_library_static {
 cc_library_static {
     defaults: ["libc_defaults"],
     srcs: ["bionic/__set_errno.cpp"],
+    cflags: ["-O3"],
     arch: {
         arm: {
             srcs: ["arch-arm/syscalls/**/*.S"],
@@ -1590,7 +1601,7 @@ cc_library_static {
         },
     },
     name: "libc_aeabi",
-    cflags: ["-fno-builtin"],
+    cflags: ["-fno-builtin","-O3"],
 }
 
 // ========================================================
@@ -1629,6 +1640,7 @@ cc_library_static {
     cflags: [
         "-fvisibility=hidden",
         "-DLIBC_STATIC",
+        "-O3",
     ],
 
     whole_static_libs: [
@@ -1656,6 +1668,7 @@ cc_library_static {
 cc_library_static {
     defaults: ["libc_defaults"],
     srcs: libc_common_src_files,
+    cflags: ["-O3"],
     multilib: {
         lib32: {
             srcs: libc_common_src_files_32,
@@ -1696,7 +1709,7 @@ cc_library_static {
 cc_library_static {
     defaults: ["libc_defaults"],
     name: "libc_common",
-
+    cflags: ["-O3"],
     whole_static_libs: [
         "libc_nopthread",
         "libc_pthread",
@@ -1724,7 +1737,7 @@ cc_library_static {
         },
     },
 
-    cflags: ["-DLIBC_STATIC"],
+    cflags: ["-DLIBC_STATIC","-O3"],
 
     whole_static_libs: [
         "libc_common",
@@ -1738,7 +1751,7 @@ cc_library_static {
 cc_library_static {
     defaults: ["libc_defaults"],
     srcs: ["bionic/jemalloc_wrapper.cpp"],
-    cflags: ["-fvisibility=hidden"],
+    cflags: ["-fvisibility=hidden","-O3"],
 
     name: "libc_malloc",
 }
@@ -1750,6 +1763,7 @@ cc_library {
     defaults: ["libc_defaults"],
     name: "libc",
     static_ndk_lib: true,
+    cflags: ["-O3"],
     product_variables: {
         platform_sdk_version: {
             asflags: ["-DPLATFORM_SDK_VERSION=%d"],
@@ -1853,6 +1867,7 @@ cc_library {
 cc_library {
     defaults: ["libc_defaults"],
     include_dirs: ["bionic/libstdc++/include"],
+    cflags: ["-O3"],
     srcs: [
         "bionic/__cxa_guard.cpp",
         "bionic/__cxa_pure_virtual.cpp",
@@ -1898,13 +1913,14 @@ cc_defaults {
         "-Wno-gcc-compat",
         "-Wall",
         "-Werror",
+        "-O3",
     ],
 }
 
 cc_defaults {
     name: "crt_so_defaults",
     defaults: ["crt_defaults"],
-
+    cflags: ["-O3"],
     arch: {
         mips: {
             cflags: ["-fPIC"],
