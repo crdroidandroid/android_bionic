@@ -37,6 +37,7 @@ libc_common_flags = [
     "-Wno-deprecated-declarations",
     "-Wno-gcc-compat",
     "-Wframe-larger-than=2048",
+    "-O3",
 
     // Try to catch typical 32-bit assumptions that break with 64-bit pointers.
     "-Werror=pointer-to-int-cast",
@@ -1992,6 +1993,7 @@ cc_defaults {
         "-Wno-gcc-compat",
         "-Wall",
         "-Werror",
+        "-O3",
     ],
     sanitize: {
         never: true,
