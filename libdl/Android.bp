@@ -34,6 +34,7 @@ cc_library_static {
         "-Wextra",
         "-Wunused",
         "-Werror",
+        "-O3",
     ],
 
     // For private/CFIShadow.h.
@@ -202,6 +203,7 @@ cc_library {
         "-Wextra",
         "-Wunused",
         "-Werror",
+        "-O3",
     ],
 
     stl: "none",
