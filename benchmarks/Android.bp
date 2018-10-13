@@ -33,7 +33,7 @@ license {
 cc_defaults {
     name: "bionic-benchmarks-defaults",
     cflags: [
-        "-O2",
+        "-O3",
         "-fno-builtin",
         "-Wall",
         "-Wextra",
@@ -86,6 +86,7 @@ cc_defaults {
         "-Wextra",
         "-Werror",
         "-Wunused",
+        "-O3",
     ],
 }
 
