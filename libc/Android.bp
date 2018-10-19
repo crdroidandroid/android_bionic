@@ -1587,6 +1587,7 @@ cc_library {
     ],
     name: "libc",
     static_ndk_lib: true,
+    export_include_dirs: ["include"],
     product_variables: {
         platform_sdk_version: {
             asflags: ["-DPLATFORM_SDK_VERSION=%d"],
