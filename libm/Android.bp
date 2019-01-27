@@ -442,6 +442,7 @@ cc_defaults {
         "-Wno-unknown-pragmas",
         "-Wno-unused-const-variable",
         "-Wno-unused-variable",
+        "-ffp-contract=fast",
     ],
 
     ldflags: [
