@@ -212,7 +212,10 @@ void PointerData::RemoveBacktrace(size_t hash_index) {
 void PointerData::Add(const void* ptr, size_t pointer_size) {
   size_t hash_index = 0;
   if (backtrace_enabled_) {
-    hash_index = AddBacktrace(g_debug->config().backtrace_frames(), pointer_size);
+    if ((pointer_size >= g_min_alloc_to_record) &&
+        (pointer_size <= g_max_alloc_to_record)) {
+      hash_index = AddBacktrace(g_debug->config().backtrace_frames(), pointer_size);
+    }
   }
 
   std::lock_guard<std::mutex> pointer_guard(pointer_mutex_);
