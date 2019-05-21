@@ -98,3 +98,9 @@ class DebugData {
 };
 
 extern DebugData* g_debug;
+
+// The minimum and maximum allocation sizes
+// for which backtrace will be recorded.
+// They default to 0 and SIZE_MAX respectively
+extern size_t g_min_alloc_to_record;
+extern size_t g_max_alloc_to_record;
