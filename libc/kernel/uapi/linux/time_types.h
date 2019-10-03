@@ -16,15 +16,25 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef _UAPI_LINUX_ISDN_DIVERTIF_H
-#define _UAPI_LINUX_ISDN_DIVERTIF_H
-#define DIVERT_IF_MAGIC 0x25873401
-#define DIVERT_CMD_REG 0x00
-#define DIVERT_CMD_REL 0x01
-#define DIVERT_NO_ERR 0x00
-#define DIVERT_CMD_ERR 0x01
-#define DIVERT_VER_ERR 0x02
-#define DIVERT_REG_ERR 0x03
-#define DIVERT_REL_ERR 0x04
-#define DIVERT_REG_NAME isdn_register_divert
+#ifndef _UAPI_LINUX_TIME_TYPES_H
+#define _UAPI_LINUX_TIME_TYPES_H
+#include <linux/types.h>
+struct __kernel_timespec {
+  __kernel_time64_t tv_sec;
+  long long tv_nsec;
+};
+struct __kernel_itimerspec {
+  struct __kernel_timespec it_interval;
+  struct __kernel_timespec it_value;
+};
+#ifndef __kernel_old_timeval
+struct __kernel_old_timeval {
+  __kernel_long_t tv_sec;
+  __kernel_long_t tv_usec;
+};
+#endif
+struct __kernel_sock_timeval {
+  __s64 tv_sec;
+  __s64 tv_usec;
+};
 #endif

@@ -29,7 +29,10 @@
 #include <private/bionic_asm.h>
 #include <private/bionic_asm_tls.h>
 #include <asm/signal.h>
-#include <linux/sched.h>
+
+// Must match the defines in linux/sched.h
+#define CLONE_VM 0x00000100
+#define CLONE_VFORK 0x00004000
 
 ENTRY(vfork)
 __BIONIC_WEAK_ASM_FOR_NATIVE_BRIDGE(vfork)

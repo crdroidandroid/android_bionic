@@ -16,27 +16,15 @@
  ***
  ****************************************************************************
  ****************************************************************************/
-#ifndef _UAPI_LINUX_FLAT_H
-#define _UAPI_LINUX_FLAT_H
-#define FLAT_VERSION 0x00000004L
-#define MAX_SHARED_LIBS (1)
-struct flat_hdr {
-  char magic[4];
-  unsigned long rev;
-  unsigned long entry;
-  unsigned long data_start;
-  unsigned long data_end;
-  unsigned long bss_end;
-  unsigned long stack_size;
-  unsigned long reloc_start;
-  unsigned long reloc_count;
-  unsigned long flags;
-  unsigned long build_date;
-  unsigned long filler[5];
-};
-#define FLAT_FLAG_RAM 0x0001
-#define FLAT_FLAG_GOTPIC 0x0002
-#define FLAT_FLAG_GZIP 0x0004
-#define FLAT_FLAG_GZDATA 0x0008
-#define FLAT_FLAG_KTRACE 0x0010
+#ifndef __INCLUDE_UAPI_SOUND_SOF_USER_HEADER_H__
+#define __INCLUDE_UAPI_SOUND_SOF_USER_HEADER_H__
+#include <linux/types.h>
+struct sof_abi_hdr {
+  __u32 magic;
+  __u32 type;
+  __u32 size;
+  __u32 abi;
+  __u32 reserved[4];
+  __u32 data[0];
+} __packed;
 #endif
