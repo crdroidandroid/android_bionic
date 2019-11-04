@@ -1,9 +1,8 @@
-#include <sys/cdefs.h>
-__FBSDID("$FreeBSD$");
+#include <math.h>
 
-#define type		float
-#define	roundit		rintf
-#define dtype		long long
-#define	fn		llrintf
+/* uses LLONG_MAX > 2^24, see comments in lrint.c */
 
-#include "s_lrint.c"
+long long llrintf(float x)
+{
+	return rintf(x);
+}
