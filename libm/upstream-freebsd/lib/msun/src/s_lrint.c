@@ -1,60 +1,75 @@
-/*-
- * SPDX-License-Identifier: BSD-2-Clause-FreeBSD
- *
- * Copyright (c) 2005 David Schultz <das@FreeBSD.ORG>
- * All rights reserved.
- *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- *
- * THIS SOFTWARE IS PROVIDED BY THE AUTHOR AND CONTRIBUTORS ``AS IS'' AND
- * ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE
- * IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE
- * ARE DISCLAIMED.  IN NO EVENT SHALL THE AUTHOR OR CONTRIBUTORS BE LIABLE
- * FOR ANY DIRECT, INDIRECT, INCIDENTAL, SPECIAL, EXEMPLARY, OR CONSEQUENTIAL
- * DAMAGES (INCLUDING, BUT NOT LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS
- * OR SERVICES; LOSS OF USE, DATA, OR PROFITS; OR BUSINESS INTERRUPTION)
- * HOWEVER CAUSED AND ON ANY THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT
- * LIABILITY, OR TORT (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY
- * OUT OF THE USE OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF
- * SUCH DAMAGE.
- */
-
-#include <sys/cdefs.h>
+#include <limits.h>
 #include <fenv.h>
 #include <math.h>
-
-#ifndef type
-__FBSDID("$FreeBSD: head/lib/msun/src/s_lrint.c 326219 2017-11-26 02:00:33Z pfg $");
-#define type		double
-#define	roundit		rint
-#define dtype		long
-#define	fn		lrint
-#endif
+#include <math_private.h>
 
 /*
- * C99 says we should not raise a spurious inexact exception when an
- * invalid exception is raised.  Unfortunately, the set of inputs
- * that overflows depends on the rounding mode when 'dtype' has more
- * significant bits than 'type'.  Hence, we bend over backwards for the
- * sake of correctness; an MD implementation could be more efficient.
- */
-dtype
-fn(type x)
-{
-	fenv_t env;
-	dtype d;
+If the result cannot be represented (overflow, nan), then
+lrint raises the invalid exception.
 
-	feholdexcept(&env);
-	d = (dtype)roundit(x);
-	if (fetestexcept(FE_INVALID))
+Otherwise if the input was not an integer then the inexact
+exception is raised.
+
+C99 is a bit vague about whether inexact exception is
+allowed to be raised when invalid is raised.
+(F.9 explicitly allows spurious inexact exceptions, F.9.6.5
+does not make it clear if that rule applies to lrint, but
+IEEE 754r 7.8 seems to forbid spurious inexact exception in
+the ineger conversion functions)
+
+So we try to make sure that no spurious inexact exception is
+raised in case of an overflow.
+
+If the bit size of long > precision of double, then there
+cannot be inexact rounding in case the result overflows,
+otherwise LONG_MAX and LONG_MIN can be represented exactly
+as a double.
+*/
+
+#define asuint64(f) ((union{double _f; uint64_t _i;}){f})._i
+#define asdouble(i) ((union{uint64_t _i; double _f;}){i})._f
+
+#if LONG_MAX < 1U<<53 && defined(FE_INEXACT)
+#include <float.h>
+#include <stdint.h>
+#if FLT_EVAL_METHOD==0 || FLT_EVAL_METHOD==1
+#define EPS DBL_EPSILON
+#elif FLT_EVAL_METHOD==2
+#define EPS LDBL_EPSILON
+#endif
+#ifdef __GNUC__
+/* avoid stack frame in lrint */
+__attribute__((noinline))
+#endif
+static long lrint_slow(double x)
+{
+	#pragma STDC FENV_ACCESS ON
+	int e;
+
+	e = fetestexcept(FE_INEXACT);
+	x = rint(x);
+	if (!e && (x > LONG_MAX || x < LONG_MIN))
 		feclearexcept(FE_INEXACT);
-	feupdateenv(&env);
-	return (d);
+	/* conversion */
+	return x;
 }
+
+long lrint(double x)
+{
+	uint32_t abstop = asuint64(x)>>32 & 0x7fffffff;
+	uint64_t sign = asuint64(x) & (1ULL << 63);
+
+	if (abstop < 0x41dfffff) {
+		/* |x| < 0x7ffffc00, no overflow */
+		double_t toint = asdouble(asuint64(1/EPS) | sign);
+		double_t y = x + toint - toint;
+		return (long)y;
+	}
+	return lrint_slow(x);
+}
+#else
+long lrint(double x)
+{
+	return rint(x);
+}
+#endif
