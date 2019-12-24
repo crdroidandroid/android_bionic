@@ -98,6 +98,7 @@ filegroup {
     srcs: [
         "arch/arm/begin.S",
         "linker_exidx_static.c",
+        "arch/arm_neon/linker_gnu_hash_neon.cpp",
     ],
 }
 
@@ -106,6 +107,7 @@ filegroup {
     srcs: [
         "arch/arm64/begin.S",
         "arch/arm64/tlsdesc_resolver.S",
+        "arch/arm_neon/linker_gnu_hash_neon.cpp",
     ],
 }
 
@@ -405,6 +407,7 @@ cc_test {
         "linked_list_test.cpp",
         "linker_sleb128_test.cpp",
         "linker_utils_test.cpp",
+        "linker_gnu_hash_test.cpp",
 
         // Parts of the linker that we're testing.
         "linker_block_allocator.cpp",
@@ -419,4 +422,30 @@ cc_test {
         "libbase",
         "liblog",
     ],
+
+    arch: {
+        arm: {
+            srcs: ["arch/arm_neon/linker_gnu_hash_neon.cpp"],
+        },
+        arm64: {
+            srcs: ["arch/arm_neon/linker_gnu_hash_neon.cpp"],
+        },
+    },
+}
+
+cc_benchmark {
+    name: "linker-benchmarks",
+
+    srcs: [
+        "linker_gnu_hash_benchmark.cpp",
+    ],
+
+    arch: {
+        arm: {
+            srcs: ["arch/arm_neon/linker_gnu_hash_neon.cpp"],
+        },
+        arm64: {
+            srcs: ["arch/arm_neon/linker_gnu_hash_neon.cpp"],
+        },
+    },
 }
