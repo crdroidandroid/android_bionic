@@ -715,9 +715,6 @@ cc_library_static {
         },
         arm64: {
             cflags: ["-DNO___MEMCPY_CHK"],
-            srcs: [
-                "arch-arm64/generic/bionic/__memcpy_chk.S",
-            ],
         },
     },
 }
@@ -808,7 +805,6 @@ cc_library_static {
                 "arch-arm64/generic/bionic/memchr.S",
                 "arch-arm64/generic/bionic/memcmp.S",
                 "arch-arm64/generic/bionic/memcpy.S",
-                "arch-arm64/generic/bionic/memmove.S",
                 "arch-arm64/generic/bionic/memset.S",
                 "arch-arm64/generic/bionic/stpcpy.S",
                 "arch-arm64/generic/bionic/strchr.S",
