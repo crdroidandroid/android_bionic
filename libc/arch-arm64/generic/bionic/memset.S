@@ -83,8 +83,6 @@
 #define zva_len		x7
 #define zva_lenw	w7
 
-#define L(l) .L ## l
-
 ENTRY(__memset_chk)
   cmp count, dst
   bls memset
