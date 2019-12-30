@@ -26,5 +26,5 @@
 */
 
 #define WMEMMOVE
-#include "memmove.S"
+#include "memcpy.S"
 #undef WMEMMOVE

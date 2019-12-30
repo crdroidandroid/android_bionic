@@ -85,4 +85,9 @@
     .globl alias; \
     .equ alias, original
 
+#define ENTRY_ALIAS(f) \
+  .globl f; \
+  .type f,  __bionic_asm_function_type; \
+  f:
+
 #endif
