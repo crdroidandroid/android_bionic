@@ -40,7 +40,6 @@
 #define pos		x15
 #define len		x16
 #define to_align	x17
-#define L(l) .L ## l
 
 	/* NUL detection works on the principle that (X - 1) & (~X) & 0x80
 	   (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and

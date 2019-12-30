@@ -40,8 +40,6 @@
 #define H_h	srcend
 #define tmp1	x14
 
-#define L(l) .L ## l
-
 /* This implementation handles overlaps and supports both memcpy and memmove
    from a single entry point.  It uses unaligned accesses and branchless
    sequences to keep the code small, simple and improve performance.

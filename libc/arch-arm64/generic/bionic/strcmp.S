@@ -32,8 +32,6 @@
 
 #include <private/bionic_asm.h>
 
-#define L(label) .L ## label
-
 #define REP8_01 0x0101010101010101
 #define REP8_7f 0x7f7f7f7f7f7f7f7f
 #define REP8_80 0x8080808080808080

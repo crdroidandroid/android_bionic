@@ -51,8 +51,6 @@
 #define tmp4		x7
 #define zeroones	x8
 
-#define L(l) .L ## l
-
 	/* NUL detection works on the principle that (X - 1) & (~X) & 0x80
 	   (=> (X - 1) & ~(X | 0x7f)) is non-zero iff a byte is zero, and
 	   can be done in parallel across the entire word. A faster check
