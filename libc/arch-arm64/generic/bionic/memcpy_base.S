@@ -1,55 +1,8 @@
-/* Copyright (c) 2012-2013, Linaro Limited
-   All rights reserved.
-
-   Redistribution and use in source and binary forms, with or without
-   modification, are permitted provided that the following conditions are met:
-       * Redistributions of source code must retain the above copyright
-         notice, this list of conditions and the following disclaimer.
-       * Redistributions in binary form must reproduce the above copyright
-         notice, this list of conditions and the following disclaimer in the
-         documentation and/or other materials provided with the distribution.
-       * Neither the name of the Linaro nor the
-         names of its contributors may be used to endorse or promote products
-         derived from this software without specific prior written permission.
-
-   THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
-   "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
-   LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
-   A PARTICULAR PURPOSE ARE DISCLAIMED. IN NO EVENT SHALL THE COPYRIGHT
-   HOLDER OR CONTRIBUTORS BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
-   SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT
-   LIMITED TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE,
-   DATA, OR PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY
-   THEORY OF LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT
-   (INCLUDING NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE
-   OF THIS SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE. */
-
 /*
- * Copyright (c) 2015 ARM Ltd
- * All rights reserved.
+ * memcpy - copy memory area
  *
- * Redistribution and use in source and binary forms, with or without
- * modification, are permitted provided that the following conditions
- * are met:
- * 1. Redistributions of source code must retain the above copyright
- *    notice, this list of conditions and the following disclaimer.
- * 2. Redistributions in binary form must reproduce the above copyright
- *    notice, this list of conditions and the following disclaimer in the
- *    documentation and/or other materials provided with the distribution.
- * 3. The name of the company may not be used to endorse or promote
- *    products derived from this software without specific prior written
- *    permission.
- *
- * THIS SOFTWARE IS PROVIDED BY ARM LTD ``AS IS'' AND ANY EXPRESS OR IMPLIED
- * WARRANTIES, INCLUDING, BUT NOT LIMITED TO, THE IMPLIED WARRANTIES OF
- * MERCHANTABILITY AND FITNESS FOR A PARTICULAR PURPOSE ARE DISCLAIMED.
- * IN NO EVENT SHALL ARM LTD BE LIABLE FOR ANY DIRECT, INDIRECT, INCIDENTAL,
- * SPECIAL, EXEMPLARY, OR CONSEQUENTIAL DAMAGES (INCLUDING, BUT NOT LIMITED
- * TO, PROCUREMENT OF SUBSTITUTE GOODS OR SERVICES; LOSS OF USE, DATA, OR
- * PROFITS; OR BUSINESS INTERRUPTION) HOWEVER CAUSED AND ON ANY THEORY OF
- * LIABILITY, WHETHER IN CONTRACT, STRICT LIABILITY, OR TORT (INCLUDING
- * NEGLIGENCE OR OTHERWISE) ARISING IN ANY WAY OUT OF THE USE OF THIS
- * SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
+ * Copyright (c) 2012-2019, Arm Limited.
+ * SPDX-License-Identifier: MIT
  */
 
 /* Assumptions:
@@ -71,54 +24,59 @@
 #define A_h	x7
 #define A_hw	w7
 #define B_l	x8
-#define B_lw   w8
+#define B_lw	w8
 #define B_h	x9
 #define C_l	x10
 #define C_h	x11
 #define D_l	x12
 #define D_h	x13
-#define E_l	src
-#define E_h	count
-#define F_l	srcend
-#define F_h	dst
-#define tmp1	x9
+#define E_l	x14
+#define E_h	x15
+#define F_l	x16
+#define F_h	x17
+#define G_l	count
+#define G_h	dst
+#define H_l	src
+#define H_h	srcend
+#define tmp1	x14
 
-/* Copies are split into 3 main cases: small copies of up to 16 bytes,
-   medium copies of 17..96 bytes which are fully unrolled. Large copies
-   of more than 96 bytes align the destination and use an unrolled loop
+/* This implementation of memcpy correctly handles overlaps, therefore
+   memmove aliases to memcpy. By moving the src and dst buffer overlap
+   check from the start of memmove code to the beginning of large copy
+   code, the overhead of combining memcpy and memmove implementations
+   is negligible.
+
+   Copies are split into 3 main cases: small copies of up to 16 bytes,
+   medium copies of 17..128 bytes which are fully unrolled, and large
+   copies (moves).
+
+   Large forward moves align the destination and use an unrolled loop
    processing 64 bytes per iteration.
-   Small and medium copies read all data before writing, allowing any
-   kind of overlap, and memmove tailcalls memcpy for these cases as
-   well as non-overlapping copies.
+
+   Large backward moves align dstend and use an unrolled loop processing
+   64 bytes per iteration.
 */
 
-	prfm    PLDL1KEEP, [src]
 	add	srcend, src, count
 	add	dstend, dstin, count
-        cmp     count, 16
-        b.ls    L(copy16)
-	cmp	count, 96
-	b.hi	L(copy_long)
+	cmp	count, 16
+	b.ls	L(copy16)
+	cmp	count, 128
+	b.hi	L(move_long)
 
-	/* Medium copies: 17..96 bytes.  */
-	sub	tmp1, count, 1
+	/* Medium copies: 17..128 bytes.  */
 	ldp	A_l, A_h, [src]
-	tbnz	tmp1, 6, L(copy96)
 	ldp	D_l, D_h, [srcend, -16]
-	tbz	tmp1, 5, 1f
-	ldp	B_l, B_h, [src, 16]
-	ldp	C_l, C_h, [srcend, -32]
-	stp	B_l, B_h, [dstin, 16]
-	stp	C_l, C_h, [dstend, -32]
-1:
+	cmp	count, 32
+	b.hi	L(copy33_128)
 	stp	A_l, A_h, [dstin]
 	stp	D_l, D_h, [dstend, -16]
 	ret
 
 	.p2align 4
-
 	/* Small copies: 0..16 bytes.  */
 L(copy16):
+	/* 8-15 bytes.  */
 	cmp	count, 8
 	b.lo	1f
 	ldr	A_l, [src]
@@ -126,8 +84,10 @@ L(copy16):
 	str	A_l, [dstin]
 	str	A_h, [dstend, -8]
 	ret
+
 	.p2align 4
 1:
+	/* 4-7 bytes.  */
 	tbz	count, 2, 1f
 	ldr	A_lw, [src]
 	ldr	A_hw, [srcend, -4]
@@ -135,6 +95,7 @@ L(copy16):
 	str	A_hw, [dstend, -4]
 	ret
 
+	.p2align 4
 	/* Copy 0..3 bytes.  Use a branchless sequence that copies the same
 	   byte 3 times if count==1, or the 2nd byte twice if count==2.  */
 1:
@@ -149,32 +110,51 @@ L(copy16):
 2:	ret
 
 	.p2align 4
-	/* Copy 64..96 bytes.  Copy 64 bytes from the start and
-	   32 bytes from the end.  */
-L(copy96):
+	/* Copy 33..128 bytes.  */
+L(copy33_128):
 	ldp	B_l, B_h, [src, 16]
-	ldp	C_l, C_h, [src, 32]
-	ldp	D_l, D_h, [src, 48]
-	ldp	E_l, E_h, [srcend, -32]
-	ldp	F_l, F_h, [srcend, -16]
+	ldp	C_l, C_h, [srcend, -32]
+	cmp	count, 64
+	b.hi	L(copy65_128)
 	stp	A_l, A_h, [dstin]
+	stp	D_l, D_h, [dstend, -16]
 	stp	B_l, B_h, [dstin, 16]
-	stp	C_l, C_h, [dstin, 32]
-	stp	D_l, D_h, [dstin, 48]
-	stp	E_l, E_h, [dstend, -32]
-	stp	F_l, F_h, [dstend, -16]
+	stp	C_l, C_h, [dstend, -32]
 	ret
 
-	/* Align DST to 16 byte alignment so that we don't cross cache line
-	   boundaries on both loads and stores.	 There are at least 96 bytes
-	   to copy, so copy 16 bytes unaligned and then align.	The loop
-	   copies 64 bytes per iteration and prefetches one iteration ahead.  */
+	.p2align 4
+	/* Copy 65..128 bytes.  */
+L(copy65_128):
+	ldp	E_l, E_h, [src, 32]
+	ldp	F_l, F_h, [src, 48]
+	ldp	G_l, G_h, [srcend, -64]
+	ldp	H_l, H_h, [srcend, -48]
+	stp	A_l, A_h, [dstin]
+	stp	D_l, D_h, [dstend, -16]
+	stp	B_l, B_h, [dstin, 16]
+	stp	C_l, C_h, [dstend, -32]
+	stp	E_l, E_h, [dstin, 32]
+	stp	F_l, F_h, [dstin, 48]
+	stp	G_l, G_h, [dstend, -64]
+	stp	H_l, H_h, [dstend, -48]
+	ret
 
 	.p2align 4
-L(copy_long):
+	/* Move more than 128 bytes.  */
+L(move_long):
+	sub	tmp1, dstin, src	/* Overlap check.  */
+	cbz	tmp1, L(copy0)
+	cmp	tmp1, count
+	b.lo	L(move_long_backwards)
+
+	/* Align dst to 16 byte alignment so that we don't cross cache line
+	   boundaries on both loads and stores.  There are at least 128 bytes
+	   to copy, so copy 16 bytes unaligned and then align.  The loop
+	   copies 64 bytes per iteration and prefetches one iteration ahead.  */
+
+	ldp	D_l, D_h, [src]
 	and	tmp1, dstin, 15
 	bic	dst, dstin, 15
-	ldp	D_l, D_h, [src]
 	sub	src, src, tmp1
 	add	count, count, tmp1	/* Count is now 16 too large.  */
 	ldp	A_l, A_h, [src, 16]
@@ -183,8 +163,9 @@ L(copy_long):
 	ldp	C_l, C_h, [src, 48]
 	ldp	D_l, D_h, [src, 64]!
 	subs	count, count, 128 + 16	/* Test and readjust count.  */
-	b.ls	2f
-1:
+	b.ls	L(copy64_from_end)
+
+L(loop64):
 	stp	A_l, A_h, [dst, 16]
 	ldp	A_l, A_h, [src, 16]
 	stp	B_l, B_h, [dst, 32]
@@ -194,12 +175,12 @@ L(copy_long):
 	stp	D_l, D_h, [dst, 64]!
 	ldp	D_l, D_h, [src, 64]!
 	subs	count, count, 64
-	b.hi	1b
+	b.hi	L(loop64)
 
-	/* Write the last full set of 64 bytes.	 The remainder is at most 64
+	/* Write the last full set of 64 bytes.  The remainder is at most 64
 	   bytes, so it is safe to always copy 64 bytes from the end even if
 	   there is just 1 byte left.  */
-2:
+L(copy64_from_end):
 	ldp	E_l, E_h, [srcend, -64]
 	stp	A_l, A_h, [dst, 16]
 	ldp	A_l, A_h, [srcend, -48]
@@ -212,4 +193,59 @@ L(copy_long):
 	stp	A_l, A_h, [dstend, -48]
 	stp	B_l, B_h, [dstend, -32]
 	stp	C_l, C_h, [dstend, -16]
+
+L(copy0):
+	ret
+
+	.p2align 4
+
+	/* Move more than 128 bytes where src and dst buffers overlap
+	   and dst > src.
+
+     Align dstend to 16 byte alignment so that we don't cross cache line
+	   boundaries on both loads and stores.  There are at least 128 bytes
+	   to copy, so copy 16 bytes unaligned and then align.  The loop
+	   copies 64 bytes per iteration and prefetches one iteration ahead.  */
+L(move_long_backwards):
+	ldp	D_l, D_h, [srcend, -16]
+	and	tmp1, dstend, 15
+	sub	srcend, srcend, tmp1
+	sub	count, count, tmp1
+	ldp	A_l, A_h, [srcend, -16]
+	stp	D_l, D_h, [dstend, -16]
+	ldp	B_l, B_h, [srcend, -32]
+	ldp	C_l, C_h, [srcend, -48]
+	ldp	D_l, D_h, [srcend, -64]!
+	sub	dstend, dstend, tmp1
+	subs	count, count, 128
+	b.ls	L(copy64_from_start)
+
+L(loop64_backwards):
+	stp	A_l, A_h, [dstend, -16]
+	ldp	A_l, A_h, [srcend, -16]
+	stp	B_l, B_h, [dstend, -32]
+	ldp	B_l, B_h, [srcend, -32]
+	stp	C_l, C_h, [dstend, -48]
+	ldp	C_l, C_h, [srcend, -48]
+	stp	D_l, D_h, [dstend, -64]!
+	ldp	D_l, D_h, [srcend, -64]!
+	subs	count, count, 64
+	b.hi	L(loop64_backwards)
+
+	/* Write the last full set of 64 bytes.  The remainder is at most 64
+	   bytes, so it is safe to always copy 64 bytes from the start even if
+	   there is just 1 byte left.  */
+L(copy64_from_start):
+	ldp	G_l, G_h, [src, 48]
+	stp	A_l, A_h, [dstend, -16]
+	ldp	A_l, A_h, [src, 32]
+	stp	B_l, B_h, [dstend, -32]
+	ldp	B_l, B_h, [src, 16]
+	stp	C_l, C_h, [dstend, -48]
+	ldp	C_l, C_h, [src]
+	stp	D_l, D_h, [dstend, -64]
+	stp	G_l, G_h, [dstin, 48]
+	stp	A_l, A_h, [dstin, 32]
+	stp	B_l, B_h, [dstin, 16]
+	stp	C_l, C_h, [dstin]
 	ret
