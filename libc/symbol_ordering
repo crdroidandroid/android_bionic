@@ -7,9 +7,7 @@ ctl_initialized
 gGlobalsMutating
 global_hashtable_initialized
 gmtcheck.gmt_is_set
-had_conf_error
 je_background_thread_enabled_state
-je_log_init_done
 je_opt_abort
 je_opt_abort_conf
 je_opt_background_thread
@@ -23,7 +21,6 @@ je_tsd_booted
 malloc_disabled_tcache
 malloc_slow_flags
 mmap_flags
-os_overcommits
 restartloop
 _ZL24gHeapprofdInitInProgress
 _ZL27gHeapprofdInitHookInstalled
@@ -43,7 +40,6 @@ __atexit
 atexit_mutex
 b0
 ctl_arenas
-ctl_stats
 __cxa_finalize.call_depth
 daylight
 dirty_decay_ms_default.0
@@ -58,19 +54,14 @@ global_hashtable
 gmtptr
 handlers
 je_background_thread_info
-je_hooks_arena_new_hook
-je_init_system_thp_mode
-je_malloc_conf
 je_malloc_disable.once_control
 je_malloc_message
 je_narenas_auto
 je_ncpus
 je_nhbins
 je_opt_dirty_decay_ms
-je_opt_metadata_thp
 je_opt_muzzy_decay_ms
 je_opt_narenas
-je_opt_thp
 je_tcache_bin_info
 je_tcache_maxclass
 je_tcaches
@@ -187,7 +178,6 @@ _ZL8g_locale
 ctl_mtx
 init_lock
 je_arenas_lock
-je_background_thread_lock
 tcaches_mtx
 je_tsd_init_head
 buf_asctime
