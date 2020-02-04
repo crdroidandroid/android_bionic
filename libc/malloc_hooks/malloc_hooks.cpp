@@ -209,14 +209,17 @@ int hooks_posix_memalign(void** memptr, size_t alignment, size_t size) {
   return g_dispatch->posix_memalign(memptr, alignment, size);
 }
 
-int hooks_malloc_iterate(uintptr_t, size_t, void (*)(uintptr_t, size_t, void*), void*) {
-  return 0;
+int hooks_malloc_iterate(uintptr_t base, size_t size,
+                         void (*callback)(uintptr_t base, size_t size, void* arg), void* arg) {
+  return g_dispatch->malloc_iterate(base, size, callback, arg);
 }
 
 void hooks_malloc_disable() {
+  g_dispatch->malloc_disable();
 }
 
 void hooks_malloc_enable() {
+  g_dispatch->malloc_disable();
 }
 
 ssize_t hooks_malloc_backtrace(void*, uintptr_t*, size_t) {
