@@ -63,7 +63,7 @@ DEFINE_IFUNC_FOR(stpcpy) {
 typedef char* strchr_func(const char*, int);
 DEFINE_IFUNC_FOR(strchr) {
     if (supports_mte(arg->_hwcap2)) {
-        RETURN_FUNC(strchr_func, strchr_mte);
+        RETURN_FUNC(strchr_func, __strchr_aarch64_mte);
     } else {
         RETURN_FUNC(strchr_func, __strchr_aarch64);
     }
