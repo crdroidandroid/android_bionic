@@ -85,7 +85,7 @@ void error_at_line(int status, int error, const char* file, unsigned int line, c
   }
 
   __error_head();
-  fprintf(stderr, "%s:%d: ", file, line);
+  fprintf(stderr, "%s:%u: ", file, line);
 
   va_list ap;
   va_start(ap, fmt);

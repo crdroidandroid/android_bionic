@@ -146,7 +146,7 @@ int je_malloc_info(int options, FILE* fp) {
   for (size_t i = 0; i < je_mallinfo_narenas(); i++) {
     struct mallinfo mi = je_mallinfo_arena_info(i);
     if (mi.hblkhd != 0) {
-      MallocXmlElem arena_elem(fp, "heap", "nr=\"%d\"", i);
+      MallocXmlElem arena_elem(fp, "heap", "nr=\"%zu\"", i);
       {
         MallocXmlElem(fp, "allocated-large").Contents("%zu", mi.ordblks);
         MallocXmlElem(fp, "allocated-huge").Contents("%zu", mi.uordblks);
@@ -156,7 +156,7 @@ int je_malloc_info(int options, FILE* fp) {
         for (size_t j = 0; j < je_mallinfo_nbins(); j++) {
           struct mallinfo mi = je_mallinfo_bin_info(i, j);
           if (mi.ordblks != 0) {
-            MallocXmlElem bin_elem(fp, "bin", "nr=\"%d\"", j);
+            MallocXmlElem bin_elem(fp, "bin", "nr=\"%zu\"", j);
             MallocXmlElem(fp, "allocated").Contents("%zu", mi.ordblks);
             MallocXmlElem(fp, "nmalloc").Contents("%zu", mi.uordblks);
             MallocXmlElem(fp, "ndalloc").Contents("%zu", mi.fordblks);
