@@ -474,7 +474,6 @@ cc_library_static {
         "upstream-openbsd/lib/libc/string/strpbrk.c",
         "upstream-openbsd/lib/libc/string/strsep.c",
         "upstream-openbsd/lib/libc/string/strspn.c",
-        "upstream-openbsd/lib/libc/string/strstr.c",
         "upstream-openbsd/lib/libc/string/strtok.c",
         "upstream-openbsd/lib/libc/string/strxfrm.c",
         "upstream-openbsd/lib/libc/string/wcslcpy.c",
@@ -502,6 +501,7 @@ cc_library_static {
     srcs: [
         "stdio/vfprintf.cpp",
         "stdio/vfwprintf.cpp",
+        "upstream-openbsd/lib/libc/string/strstr.c",
     ],
     cflags: [
         "-include openbsd-compat.h",
@@ -550,6 +550,7 @@ cc_library_static {
                 "upstream-openbsd/lib/libc/string/strcpy.c",
                 "upstream-openbsd/lib/libc/string/stpcpy.c",
                 "upstream-openbsd/lib/libc/string/strcat.c",
+                "upstream-openbsd/lib/libc/string/memchr.c",
             ],
         },
         arm64: {
@@ -714,9 +715,6 @@ cc_library_static {
         },
         arm64: {
             cflags: ["-DNO___MEMCPY_CHK"],
-            srcs: [
-                "arch-arm64/generic/bionic/__memcpy_chk.S",
-            ],
         },
     },
 }
@@ -751,6 +749,7 @@ cc_library_static {
     arch: {
         arm: {
             srcs: [
+                "arch-arm/generic/bionic/memchr.S",
                 "arch-arm/generic/bionic/memcmp.S",
                 "arch-arm/generic/bionic/memmove.S",
                 "arch-arm/generic/bionic/memset.S",
@@ -788,13 +787,11 @@ cc_library_static {
                 "arch-arm/cortex-a9/bionic/memset.S",
                 "arch-arm/cortex-a9/bionic/stpcpy.S",
                 "arch-arm/cortex-a9/bionic/strcat.S",
-                "arch-arm/cortex-a9/bionic/strcmp.S",
                 "arch-arm/cortex-a9/bionic/strcpy.S",
                 "arch-arm/cortex-a9/bionic/strlen.S",
 
                 "arch-arm/krait/bionic/memcpy.S",
                 "arch-arm/krait/bionic/memset.S",
-                "arch-arm/krait/bionic/strcmp.S",
 
                 "arch-arm/cortex-a53/bionic/memcpy.S",
 
@@ -808,10 +805,10 @@ cc_library_static {
                 "arch-arm64/generic/bionic/memchr.S",
                 "arch-arm64/generic/bionic/memcmp.S",
                 "arch-arm64/generic/bionic/memcpy.S",
-                "arch-arm64/generic/bionic/memmove.S",
                 "arch-arm64/generic/bionic/memset.S",
                 "arch-arm64/generic/bionic/stpcpy.S",
                 "arch-arm64/generic/bionic/strchr.S",
+                "arch-arm64/generic/bionic/strrchr.S",
                 "arch-arm64/generic/bionic/strcmp.S",
                 "arch-arm64/generic/bionic/strcpy.S",
                 "arch-arm64/generic/bionic/strlen.S",
@@ -829,6 +826,7 @@ cc_library_static {
                 "bionic/__memcpy_chk.cpp",
                 "bionic/strchr.cpp",
                 "bionic/strnlen.c",
+                "bionic/strrchr.cpp",
             ],
         },
 
