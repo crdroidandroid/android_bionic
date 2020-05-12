@@ -556,6 +556,7 @@ cc_library_static {
         arm64: {
             exclude_srcs: [
                 "upstream-openbsd/lib/libc/string/memchr.c",
+                "upstream-openbsd/lib/libc/string/memrchr.c",
                 "upstream-openbsd/lib/libc/string/stpcpy.c",
                 "upstream-openbsd/lib/libc/string/strcpy.c",
                 "upstream-openbsd/lib/libc/string/strncmp.c",
@@ -817,6 +818,7 @@ cc_library_static {
                 "arch-arm64/generic/bionic/memcmp.S",
                 "arch-arm64/generic/bionic/memcpy.S",
                 "arch-arm64/generic/bionic/memmove.S",
+                "arch-arm64/generic/bionic/memrchr.S",
                 "arch-arm64/generic/bionic/memset.S",
                 "arch-arm64/generic/bionic/stpcpy.S",
                 "arch-arm64/generic/bionic/strchr.S",
