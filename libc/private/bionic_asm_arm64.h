@@ -41,5 +41,3 @@
 
 #undef __bionic_asm_function_type
 #define __bionic_asm_function_type %function
-
-#define L(l) .L ## l

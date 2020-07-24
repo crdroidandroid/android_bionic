@@ -33,6 +33,8 @@
 
 #include <private/bionic_asm.h>
 
+#define L(l) .L ## l
+
 /* Parameters and result.  */
 #define src1		x0
 #define src2		x1
