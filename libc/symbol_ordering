@@ -89,7 +89,6 @@ __realloc_hook
 _res_cache_list_lock
 _res_cache_once
 _res_key
-__res_randomid.__libc_mutex_random
 rs
 _rs_forkdetect._rs_pid
 _rs_forked
@@ -139,7 +138,6 @@ _ZZ8towlowerE9u_tolower
 _ZZ8towupperE9u_toupper
 ether_aton.addr
 seed48.sseed
-__dtoa_locks
 _ZGVZ14__icu_charTypejE10u_charType
 _ZGVZ14tzset_unlockedE20persist_sys_timezone
 _ZGVZ17__find_icu_symbolPKcE9found_icu
