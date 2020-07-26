@@ -1,8 +1,9 @@
-#include <math.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-/* uses LLONG_MAX > 2^53, see comments in lrint.c */
+#define type		double
+#define	roundit		rint
+#define dtype		long long
+#define	fn		llrint
 
-long long llrint(double x)
-{
-	return rint(x);
-}
+#include "s_lrint.c"

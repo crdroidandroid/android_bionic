@@ -1,6 +1,11 @@
-#include <math.h>
+#include <sys/cdefs.h>
+__FBSDID("$FreeBSD$");
 
-long lroundf(float x)
-{
-	return roundf(x);
-}
+#define type		float
+#define	roundit		roundf
+#define dtype		long
+#define	DTYPE_MIN	LONG_MIN
+#define	DTYPE_MAX	LONG_MAX
+#define	fn		lroundf
+
+#include "s_lround.c"
