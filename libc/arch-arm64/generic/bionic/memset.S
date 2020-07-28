@@ -1,6 +1,5 @@
 /* Copyright (c) 2012-2013, Linaro Limited
    All rights reserved.
-
    Redistribution and use in source and binary forms, with or without
    modification, are permitted provided that the following conditions are met:
        * Redistributions of source code must retain the above copyright
@@ -11,7 +10,6 @@
        * Neither the name of the Linaro nor the
          names of its contributors may be used to endorse or promote products
          derived from this software without specific prior written permission.
-
    THIS SOFTWARE IS PROVIDED BY THE COPYRIGHT HOLDERS AND CONTRIBUTORS
    "AS IS" AND ANY EXPRESS OR IMPLIED WARRANTIES, INCLUDING, BUT NOT
    LIMITED TO, THE IMPLIED WARRANTIES OF MERCHANTABILITY AND FITNESS FOR
@@ -65,7 +63,6 @@
    unsafe, for example in an asymmetric multiprocessor environment with
    different DC clear lengths (neither the upper nor lower lengths are
    safe to use).
-
    If code may be run in a virtualized environment, then define
    MAYBE_VIRT.  This will cause the code to cache the system register
    values rather than re-reading them each call.  */
@@ -153,10 +150,10 @@ L(set_long):
 	b.eq	L(try_zva)
 L(no_zva):
 	sub	count, dstend, dst	/* Count is 16 too large.  */
-	add	dst, dst, 16
+	sub	dst, dst, 16		/* Dst is biased by -32.  */
 	sub	count, count, 64 + 16	/* Adjust count and bias for loop.  */
-1:	stp	q0, q0, [dst], 64
-	stp	q0, q0, [dst, -32]
+1:	stp	q0, q0, [dst, 32]
+	stp	q0, q0, [dst, 64]!
 L(tail64):
 	subs	count, count, 64
 	b.hi	1b
@@ -244,6 +241,7 @@ L(zva_other):
 	subs	count, count, zva_len
 	b.hs	3b
 4:	add	count, count, zva_len
+	sub	dst, dst, 32		/* Bias dst for tail loop.  */
 	b	L(tail64)
 
 END(memset)
