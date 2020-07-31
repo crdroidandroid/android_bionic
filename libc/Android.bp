@@ -1909,6 +1909,7 @@ cc_library_headers {
         "//system/memory/libmemunreachable:__subpackages__",
         "//system/unwinding/libunwindstack:__subpackages__",
         "//tools/security/sanitizer-status:__subpackages__",
+        "//vendor:__subpackages__",
     ],
     vendor_available: true,
     product_available: true,
