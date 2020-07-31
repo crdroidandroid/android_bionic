@@ -1768,6 +1768,7 @@ cc_library_headers {
         "//external/scudo:__subpackages__",
         "//system/core/debuggerd:__subpackages__",
         "//system/memory/libmemunreachable:__subpackages__",
+        "//vendor:__subpackages__",
     ],
     host_supported: true,
     vendor_available: true,
