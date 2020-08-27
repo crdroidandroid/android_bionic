@@ -62,14 +62,11 @@
 #if defined(WMEMMOVE)
 ENTRY(wmemmove)
 	lsl	x2, x2, #2
-#include "memcpy_base.S"
-#undef WMEMMOVE
 #else
-#define MEMMOVE
 ENTRY(memmove)
-#include "memcpy_base.S"
-#undef MEMMOVE
 #endif
+
+#include "memcpy_base.S"
 
 #if defined(WMEMMOVE)
 END(wmemmove)
