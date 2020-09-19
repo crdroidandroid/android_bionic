@@ -161,30 +161,32 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 //
 //     7. SMALL ARGUMENTS
 //
-//     Inputs with |X| < 2^-252 are treated specially as
-//     1 - |x|.
+//     If |x| < SNN (SNN meaning the smallest normal number), we
+//     simply perform 0.1111111 cdots 1111 * x. For SNN <= |x|, we
+//     do 2^-55 * (2^55 * x - x).
 //
 // Special cases:
-//  cos(NaN) = quiet NaN, and raise invalid exception
-//  cos(INF) = NaN and raise invalid exception
-//  cos(0) = 1
+//  sin(NaN) = quiet NaN, and raise invalid exception
+//  sin(INF) = NaN and raise invalid exception
+//  sin(+/-0) = +/-0
 //
 /******************************************************************************/
 
 #include <private/bionic_asm.h>
-# -- Begin  cos
-ENTRY(cos)
+# -- Begin  sin
+ENTRY(sin_generic)
 # parameter 1: %xmm0
 ..B1.1:
-..___tag_value_cos.1:
+..___tag_value_sin.1:
         pushq     %rbx
-..___tag_value_cos.3:
+..___tag_value_sin.3:
         subq      $16, %rsp
-..___tag_value_cos.5:
+..___tag_value_sin.5:
         movsd     %xmm0, 8(%rsp)
 ..B1.2:
         movl      12(%rsp), %eax
         movq      PI32INV(%rip), %xmm1
+        movq      SHIFTER(%rip), %xmm2
         andl      $2147418112, %eax
         subl      $808452096, %eax
         cmpl      $281346048, %eax
@@ -197,34 +199,34 @@ ENTRY(cos)
         addpd     %xmm5, %xmm1
         cvttsd2si %xmm1, %edx
         cvtsi2sd  %edx, %xmm1
-        movapd    P_2(%rip), %xmm2
-        movq      P_1(%rip), %xmm3
-        mulsd     %xmm1, %xmm3
-        unpcklpd  %xmm1, %xmm1
-        addq      $1865232, %rdx
-        movq      %xmm0, %xmm4
-        andq      $63, %rdx
+        movapd    P_2(%rip), %xmm6
+        movq      $0x3fb921fb54400000, %r8
+        movd      %r8, %xmm3
         movapd    SC_4(%rip), %xmm5
+        pshufd    $68, %xmm0, %xmm4
+        mulsd     %xmm1, %xmm3
+        movddup   %xmm1, %xmm1
+        andl      $63, %edx
+        shll      $5, %edx
         lea       Ctable(%rip), %rax
-        shlq      $5, %rdx
         addq      %rdx, %rax
-        mulpd     %xmm1, %xmm2
-        subsd     %xmm3, %xmm0
+        mulpd     %xmm1, %xmm6
         mulsd     P_3(%rip), %xmm1
         subsd     %xmm3, %xmm4
         movq      8(%rax), %xmm7
-        unpcklpd  %xmm0, %xmm0
-        movq      %xmm4, %xmm3
-        subsd     %xmm2, %xmm4
+        subsd     %xmm3, %xmm0
+        movddup   %xmm4, %xmm3
+        subsd     %xmm6, %xmm4
+        pshufd    $68, %xmm0, %xmm0
+        movapd    (%rax), %xmm2
         mulpd     %xmm0, %xmm5
-        subpd     %xmm2, %xmm0
-        movapd    SC_2(%rip), %xmm6
+        subpd     %xmm6, %xmm0
         mulsd     %xmm4, %xmm7
         subsd     %xmm4, %xmm3
         mulpd     %xmm0, %xmm5
         mulpd     %xmm0, %xmm0
-        subsd     %xmm2, %xmm3
-        movapd    (%rax), %xmm2
+        subsd     %xmm6, %xmm3
+        movapd    SC_2(%rip), %xmm6
         subsd     %xmm3, %xmm1
         movq      24(%rax), %xmm3
         addsd     %xmm3, %xmm2
@@ -249,29 +251,34 @@ ENTRY(cos)
         subsd     %xmm4, %xmm3
         addsd     16(%rax), %xmm1
         mulpd     %xmm2, %xmm6
-        addsd     %xmm5, %xmm0
+        addsd     %xmm0, %xmm5
         addsd     %xmm7, %xmm3
-        addsd     %xmm1, %xmm0
-        addsd     %xmm3, %xmm0
-        addsd     %xmm6, %xmm0
+        addsd     %xmm5, %xmm1
+        addsd     %xmm3, %xmm1
+        addsd     %xmm6, %xmm1
         unpckhpd  %xmm6, %xmm6
-        addsd     %xmm6, %xmm0
-        addsd     %xmm4, %xmm0
+        movq      %xmm4, %xmm0
+        addsd     %xmm6, %xmm1
+        addsd     %xmm1, %xmm0
         jmp       ..B1.4
 .L_2TAG_PACKET_0.0.1:
         jg        .L_2TAG_PACKET_1.0.1
-        pextrw    $3, %xmm0, %eax
-        andw      $32767, %ax
-        pinsrw    $3, %eax, %xmm0
-        movq      ONE(%rip), %xmm1
-        subsd     %xmm0, %xmm1
-        movq      %xmm1, %xmm0
+        shrl      $20, %eax
+        cmpw      $3325, %ax
+        jne       .L_2TAG_PACKET_2.0.1
+        mulsd     ALL_ONES(%rip), %xmm0
+        jmp       ..B1.4
+.L_2TAG_PACKET_2.0.1:
+        movq      TWO_POW_55(%rip), %xmm3
+        mulsd     %xmm0, %xmm3
+        subsd     %xmm0, %xmm3
+        mulsd     TWO_POW_M55(%rip), %xmm3
         jmp       ..B1.4
 .L_2TAG_PACKET_1.0.1:
         pextrw    $3, %xmm0, %eax
         andl      $32752, %eax
         cmpl      $32752, %eax
-        je        .L_2TAG_PACKET_2.0.1
+        je        .L_2TAG_PACKET_3.0.1
         pextrw    $3, %xmm0, %ecx
         andl      $32752, %ecx
         subl      $16224, %ecx
@@ -364,27 +371,27 @@ ENTRY(cos)
         movl      %ecx, %edx
         addl      $32, %edx
         cmpl      $1, %ecx
-        jl        .L_2TAG_PACKET_3.0.1
+        jl        .L_2TAG_PACKET_4.0.1
         negl      %ecx
         addl      $29, %ecx
         shll      %cl, %r9d
         movl      %r9d, %edi
         andl      $536870911, %r9d
         testl     $268435456, %r9d
-        jne       .L_2TAG_PACKET_4.0.1
+        jne       .L_2TAG_PACKET_5.0.1
         shrl      %cl, %r9d
         movl      $0, %ebx
         shlq      $32, %r9
         orq       %r11, %r9
-.L_2TAG_PACKET_5.0.1:
 .L_2TAG_PACKET_6.0.1:
+.L_2TAG_PACKET_7.0.1:
         cmpq      $0, %r9
-        je        .L_2TAG_PACKET_7.0.1
-.L_2TAG_PACKET_8.0.1:
+        je        .L_2TAG_PACKET_8.0.1
+.L_2TAG_PACKET_9.0.1:
         bsr       %r9, %r11
         movl      $29, %ecx
         subl      %r11d, %ecx
-        jle       .L_2TAG_PACKET_9.0.1
+        jle       .L_2TAG_PACKET_10.0.1
         shlq      %cl, %r9
         movq      %r10, %rax
         shlq      %cl, %r10
@@ -395,7 +402,7 @@ ENTRY(cos)
         shrq      %cl, %r8
         orq       %rax, %r9
         orq       %r8, %r10
-.L_2TAG_PACKET_10.0.1:
+.L_2TAG_PACKET_11.0.1:
         cvtsi2sdq %r9, %xmm0
         shrq      $1, %r10
         cvtsi2sdq %r10, %xmm3
@@ -429,7 +436,7 @@ ENTRY(cos)
         addsd     %xmm6, %xmm0
         subsd     %xmm0, %xmm2
         addsd     %xmm2, %xmm6
-.L_2TAG_PACKET_11.0.1:
+.L_2TAG_PACKET_12.0.1:
         movq      PI32INV(%rip), %xmm1
         mulsd     %xmm0, %xmm1
         movq      ONEHALF(%rip), %xmm5
@@ -437,14 +444,14 @@ ENTRY(cos)
         andpd     %xmm0, %xmm4
         orps      %xmm4, %xmm5
         addpd     %xmm5, %xmm1
-        cvttsd2si %xmm1, %rdx
-        cvtsi2sdq %rdx, %xmm1
+        cvttsd2si %xmm1, %edx
+        cvtsi2sd  %edx, %xmm1
         movq      P_1(%rip), %xmm3
         movapd    P_2(%rip), %xmm2
         mulsd     %xmm1, %xmm3
         unpcklpd  %xmm1, %xmm1
         shll      $3, %eax
-        addl      $1865232, %edx
+        addl      $1865216, %edx
         movq      %xmm0, %xmm4
         addl      %eax, %edx
         andl      $63, %edx
@@ -504,23 +511,23 @@ ENTRY(cos)
         addsd     %xmm6, %xmm1
         addsd     %xmm1, %xmm0
         jmp       ..B1.4
-.L_2TAG_PACKET_7.0.1:
+.L_2TAG_PACKET_8.0.1:
         addl      $64, %edx
         movq      %r10, %r9
         movq      %r8, %r10
         movq      $0, %r8
         cmpq      $0, %r9
-        jne       .L_2TAG_PACKET_8.0.1
+        jne       .L_2TAG_PACKET_9.0.1
         addl      $64, %edx
         movq      %r10, %r9
         movq      %r8, %r10
         cmpq      $0, %r9
-        jne       .L_2TAG_PACKET_8.0.1
+        jne       .L_2TAG_PACKET_9.0.1
         xorpd     %xmm0, %xmm0
         xorpd     %xmm6, %xmm6
-        jmp       .L_2TAG_PACKET_11.0.1
-.L_2TAG_PACKET_9.0.1:
-        je        .L_2TAG_PACKET_10.0.1
+        jmp       .L_2TAG_PACKET_12.0.1
+.L_2TAG_PACKET_10.0.1:
+        je        .L_2TAG_PACKET_11.0.1
         negl      %ecx
         shrq      %cl, %r10
         movq      %r9, %rax
@@ -530,20 +537,20 @@ ENTRY(cos)
         addl      $64, %ecx
         shlq      %cl, %rax
         orq       %rax, %r10
-        jmp       .L_2TAG_PACKET_10.0.1
-.L_2TAG_PACKET_3.0.1:
+        jmp       .L_2TAG_PACKET_11.0.1
+.L_2TAG_PACKET_4.0.1:
         negl      %ecx
         shlq      $32, %r9
         orq       %r11, %r9
         shlq      %cl, %r9
         movq      %r9, %rdi
         testl     $-2147483648, %r9d
-        jne       .L_2TAG_PACKET_12.0.1
+        jne       .L_2TAG_PACKET_13.0.1
         shrl      %cl, %r9d
         movl      $0, %ebx
         shrq      $3, %rdi
-        jmp       .L_2TAG_PACKET_6.0.1
-.L_2TAG_PACKET_4.0.1:
+        jmp       .L_2TAG_PACKET_7.0.1
+.L_2TAG_PACKET_5.0.1:
         shrl      %cl, %r9d
         movl      $536870912, %ebx
         shrl      %cl, %ebx
@@ -560,8 +567,8 @@ ENTRY(cos)
         movq      %r11, %r10
         movq      %rbx, %r9
         movl      $32768, %ebx
-        jmp       .L_2TAG_PACKET_5.0.1
-.L_2TAG_PACKET_12.0.1:
+        jmp       .L_2TAG_PACKET_6.0.1
+.L_2TAG_PACKET_13.0.1:
         shrl      %cl, %r9d
         movq      $0x100000000, %rbx
         shrq      %cl, %rbx
@@ -576,21 +583,21 @@ ENTRY(cos)
         movl      $32768, %ebx
         shrq      $3, %rdi
         addl      $536870912, %edi
-        jmp       .L_2TAG_PACKET_6.0.1
-.L_2TAG_PACKET_2.0.1:
-        movsd     8(%rsp), %xmm0
+        jmp       .L_2TAG_PACKET_7.0.1
+.L_2TAG_PACKET_3.0.1:
+        movq      8(%rsp), %xmm0
         mulsd     NEG_ZERO(%rip), %xmm0
         movq      %xmm0, (%rsp)
-.L_2TAG_PACKET_13.0.1:
+.L_2TAG_PACKET_14.0.1:
 ..B1.4:
         addq      $16, %rsp
-..___tag_value_cos.6:
+..___tag_value_sin.6:
         popq      %rbx
-..___tag_value_cos.8:
+..___tag_value_sin.8:
         ret       
-..___tag_value_cos.9:
-END(cos)
-# -- End  cos
+..___tag_value_sin.9:
+END(sin_generic)
+# -- End  sin
 	.section .rodata, "a"
 	.align 16
 	.align 16
@@ -1218,17 +1225,17 @@ PI32INV:
 	.type	PI32INV,@object
 	.size	PI32INV,8
 	.align 8
+SHIFTER:
+	.long	0
+	.long	1127743488
+	.type	SHIFTER,@object
+	.size	SHIFTER,8
+	.align 8
 SIGN_MASK:
 	.long	0
 	.long	2147483648
 	.type	SIGN_MASK,@object
 	.size	SIGN_MASK,8
-	.align 8
-P_1:
-	.long	1413480448
-	.long	1069097467
-	.type	P_1,@object
-	.size	P_1,8
 	.align 8
 P_3:
 	.long	771977331
@@ -1236,11 +1243,29 @@ P_3:
 	.type	P_3,@object
 	.size	P_3,8
 	.align 8
-ONE:
+ALL_ONES:
+	.long	4294967295
+	.long	1072693247
+	.type	ALL_ONES,@object
+	.size	ALL_ONES,8
+	.align 8
+TWO_POW_55:
 	.long	0
-	.long	1072693248
-	.type	ONE,@object
-	.size	ONE,8
+	.long	1130364928
+	.type	TWO_POW_55,@object
+	.size	TWO_POW_55,8
+	.align 8
+TWO_POW_M55:
+	.long	0
+	.long	1015021568
+	.type	TWO_POW_M55,@object
+	.size	TWO_POW_M55,8
+	.align 8
+P_1:
+	.long	1413480448
+	.long	1069097467
+	.type	P_1,@object
+	.size	P_1,8
 	.align 8
 NEG_ZERO:
 	.long	0
@@ -1259,17 +1284,17 @@ NEG_ZERO:
 	.4byte 0x00000190
 	.4byte 0x0000002c
 	.4byte 0x0000001c
-	.4byte ..___tag_value_cos.1-.
-	.4byte ..___tag_value_cos.9-..___tag_value_cos.1
+	.4byte ..___tag_value_sin.1-.
+	.4byte ..___tag_value_sin.9-..___tag_value_sin.1
 	.2byte 0x0400
-	.4byte ..___tag_value_cos.3-..___tag_value_cos.1
+	.4byte ..___tag_value_sin.3-..___tag_value_sin.1
 	.4byte 0x0283100e
 	.byte 0x04
-	.4byte ..___tag_value_cos.5-..___tag_value_cos.3
+	.4byte ..___tag_value_sin.5-..___tag_value_sin.3
 	.2byte 0x200e
 	.byte 0x04
-	.4byte ..___tag_value_cos.6-..___tag_value_cos.5
+	.4byte ..___tag_value_sin.6-..___tag_value_sin.5
 	.4byte 0x04c3100e
-	.4byte ..___tag_value_cos.8-..___tag_value_cos.6
+	.4byte ..___tag_value_sin.8-..___tag_value_sin.6
 	.2byte 0x080e
 # End

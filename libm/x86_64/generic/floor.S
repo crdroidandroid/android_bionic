@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <private/bionic_asm.h>
 
-ENTRY(floor)
+ENTRY(floor_generic)
 roundsd $0x1,%xmm0,%xmm0
 retq
-END(floor)
+END(floor_generic)

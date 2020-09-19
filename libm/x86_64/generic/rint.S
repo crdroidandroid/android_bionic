@@ -30,7 +30,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <private/bionic_asm.h>
 
-ENTRY(rintf)
-  roundss $0x4,%xmm0,%xmm0
+ENTRY(rint_generic)
+  roundsd $0x4,%xmm0,%xmm0
   retq
-END(rintf)
+END(rint_generic)

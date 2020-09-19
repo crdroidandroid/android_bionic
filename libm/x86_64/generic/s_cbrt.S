@@ -49,7 +49,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <private/bionic_asm.h>
 # -- Begin  cbrt
-ENTRY(cbrt)
+ENTRY(cbrt_generic)
 # parameter 1: %xmm0
 ..B1.1:
 ..___tag_value_cbrt.1:
@@ -198,7 +198,7 @@ ENTRY(cbrt)
 ..___tag_value_cbrt.4:
         ret       
 ..___tag_value_cbrt.5:
-END(cbrt)
+END(cbrt_generic)
 # -- End  cbrt
 	.section .rodata, "a"
 	.align 16

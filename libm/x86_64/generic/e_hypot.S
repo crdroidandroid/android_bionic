@@ -65,7 +65,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <private/bionic_asm.h>
 # -- Begin  hypot
-ENTRY(hypot)
+ENTRY(hypot_generic)
 # parameter 1: %xmm0
 # parameter 2: %xmm1
 ..B1.1:
@@ -174,7 +174,7 @@ ENTRY(hypot)
         ret       
 ..B1.3:
 ..___tag_value_hypot.4:
-END(hypot)
+END(hypot_generic)
 # -- End  hypot
 	.section .rodata, "a"
 	.align 16

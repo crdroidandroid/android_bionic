@@ -55,7 +55,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <private/bionic_asm.h>
 # -- Begin  log1p
-ENTRY(log1p)
+ENTRY(log1p_generic)
 # parameter 1: %xmm0
 ..B1.1:
 ..___tag_value_log1p.1:
@@ -241,7 +241,7 @@ ENTRY(log1p)
 ..___tag_value_log1p.4:
         ret       
 ..___tag_value_log1p.5:
-END(log1p)
+END(log1p_generic)
 # -- End  log1p
 	.section .rodata, "a"
 	.align 16

@@ -30,7 +30,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <private/bionic_asm.h>
 
-ENTRY(ceilf)
-roundss $0x2,%xmm0,%xmm0
+
+ENTRY(ceil_generic)
+roundsd $0x2,%xmm0,%xmm0
 retq
-END(ceilf)
+END(ceil_generic)
