@@ -78,7 +78,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 
 #include <private/bionic_asm.h>
 # -- Begin  sinh
-ENTRY(sinh)
+ENTRY(sinh_generic)
 # parameter 1: %xmm0
 ..B1.1:
 ..___tag_value_sinh.1:
@@ -300,7 +300,7 @@ ENTRY(sinh)
 ..___tag_value_sinh.4:
         ret       
 ..___tag_value_sinh.5:
-END(sinh)
+END(sinh_generic)
 # -- End  sinh
 	.section .rodata, "a"
 	.align 16
