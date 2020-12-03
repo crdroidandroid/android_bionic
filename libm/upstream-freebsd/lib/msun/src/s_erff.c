@@ -77,6 +77,7 @@ sb1  =  4.87132740e+00, /* 0x409be1ea */
 sb2  =  3.04982710e+00, /* 0x4043305e */
 sb3  = -7.61900663e-01; /* 0xbf430bec */
 
+#if 0
 float
 erff(float x)
 {
@@ -123,6 +124,7 @@ erff(float x)
 	r  = expf(-z*z-0.5625F)*expf((z-x)*(z+x)+R/S);
 	if(hx>=0) return one-r/x; else return  r/x-one;
 }
+#endif
 
 float
 erfcf(float x)

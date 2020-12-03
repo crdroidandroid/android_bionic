@@ -194,7 +194,7 @@ sb6  =  4.74528541206955367215e+02, /* 0x407DA874, 0xE79FE763 */
 sb7  = -2.24409524465858183362e+01; /* 0xC03670E2, 0x42712D62 */
 
 double
-erf(double x)
+__erf(double x)
 {
 	int32_t hx,ix,i;
 	double R,S,P,Q,s,y,z,r;
@@ -243,7 +243,7 @@ erf(double x)
 }
 
 #if (LDBL_MANT_DIG == 53)
-__weak_reference(erf, erfl);
+__weak_reference(__erf, erfl);
 #endif
 
 double
