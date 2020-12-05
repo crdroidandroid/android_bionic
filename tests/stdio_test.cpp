@@ -33,6 +33,7 @@
 #include <vector>
 
 #include <android-base/file.h>
+#include <android-base/test_utils.h>
 #include <android-base/unique_fd.h>
 
 #include "BionicDeathTest.h"
@@ -2732,4 +2733,140 @@ TEST(STDIO_TEST, renameat2_flags) {
  ASSERT_NE(0, RENAME_NOREPLACE);
  ASSERT_NE(0, RENAME_WHITEOUT);
 #endif
+}
+
+TEST(STDIO_TEST, fdopen_failures) {
+  FILE* fp;
+  int fd = open("/proc/version", O_RDONLY);
+  ASSERT_TRUE(fd != -1);
+
+  // Nonsense mode.
+  errno = 0;
+  fp = fdopen(fd, "nonsense");
+  ASSERT_TRUE(fp == nullptr);
+  ASSERT_EQ(EINVAL, errno);
+
+  // Mode that isn't a subset of the fd's actual mode.
+  errno = 0;
+  fp = fdopen(fd, "w");
+  ASSERT_TRUE(fp == nullptr);
+  ASSERT_EQ(EINVAL, errno);
+
+  // Can't set append on the underlying fd.
+  errno = 0;
+  fp = fdopen(fd, "a");
+  ASSERT_TRUE(fp == nullptr);
+  ASSERT_EQ(EINVAL, errno);
+
+  // Bad fd.
+  errno = 0;
+  fp = fdopen(-1, "re");
+  ASSERT_TRUE(fp == nullptr);
+  ASSERT_EQ(EBADF, errno);
+
+  close(fd);
+}
+
+TEST(STDIO_TEST, fmemopen_invalid_mode) {
+  errno = 0;
+  FILE* fp = fmemopen(nullptr, 16, "nonsense");
+  ASSERT_TRUE(fp == nullptr);
+  ASSERT_EQ(EINVAL, errno);
+}
+
+TEST(STDIO_TEST, fopen_invalid_mode) {
+  errno = 0;
+  FILE* fp = fopen("/proc/version", "nonsense");
+  ASSERT_TRUE(fp == nullptr);
+  ASSERT_EQ(EINVAL, errno);
+}
+
+TEST(STDIO_TEST, freopen_invalid_mode) {
+  FILE* fp = fopen("/proc/version", "re");
+  ASSERT_TRUE(fp != nullptr);
+
+  errno = 0;
+  fp = freopen("/proc/version", "nonsense", fp);
+  ASSERT_TRUE(fp == nullptr);
+  ASSERT_EQ(EINVAL, errno);
+}
+
+TEST(STDIO_TEST, asprintf_smoke) {
+  char* p = nullptr;
+  ASSERT_EQ(11, asprintf(&p, "hello %s", "world"));
+  ASSERT_STREQ("hello world", p);
+  free(p);
+}
+
+TEST(STDIO_TEST, fopen_ENOENT) {
+  errno = 0;
+  FILE* fp = fopen("/proc/does-not-exist", "re");
+  ASSERT_TRUE(fp == nullptr);
+  ASSERT_EQ(ENOENT, errno);
+}
+
+static void tempnam_test(bool has_TMPDIR, const char* dir, const char* prefix, const char* re) {
+  if (has_TMPDIR) {
+    setenv("TMPDIR", "/my/tmp/dir", 1);
+  } else {
+    unsetenv("TMPDIR");
+  }
+  char* s1 = tempnam(dir, prefix);
+  char* s2 = tempnam(dir, prefix);
+  ASSERT_MATCH(s1, re);
+  ASSERT_MATCH(s2, re);
+  ASSERT_STRNE(s1, s2);
+  free(s1);
+  free(s2);
+}
+
+TEST(STDIO_TEST, tempnam__system_directory_system_prefix_with_TMPDIR) {
+  tempnam_test(true, nullptr, nullptr, "^/my/tmp/dir/.*");
+}
+
+TEST(STDIO_TEST, tempnam__system_directory_system_prefix_without_TMPDIR) {
+  tempnam_test(false, nullptr, nullptr, "^/data/local/tmp/.*");
+}
+
+TEST(STDIO_TEST, tempnam__system_directory_user_prefix_with_TMPDIR) {
+  tempnam_test(true, nullptr, "prefix", "^/my/tmp/dir/prefix.*");
+}
+
+TEST(STDIO_TEST, tempnam__system_directory_user_prefix_without_TMPDIR) {
+  tempnam_test(false, nullptr, "prefix", "^/data/local/tmp/prefix.*");
+}
+
+TEST(STDIO_TEST, tempnam__user_directory_system_prefix_with_TMPDIR) {
+  tempnam_test(true, "/a/b/c", nullptr, "^/my/tmp/dir/.*");
+}
+
+TEST(STDIO_TEST, tempnam__user_directory_system_prefix_without_TMPDIR) {
+  tempnam_test(false, "/a/b/c", nullptr, "^/a/b/c/.*");
+}
+
+TEST(STDIO_TEST, tempnam__user_directory_user_prefix_with_TMPDIR) {
+  tempnam_test(true, "/a/b/c", "prefix", "^/my/tmp/dir/prefix.*");
+}
+
+TEST(STDIO_TEST, tempnam__user_directory_user_prefix_without_TMPDIR) {
+  tempnam_test(false, "/a/b/c", "prefix", "^/a/b/c/prefix.*");
+}
+
+static void tmpnam_test(char* s) {
+  char s1[L_tmpnam], s2[L_tmpnam];
+
+  strcpy(s1, tmpnam(s));
+  strcpy(s2, tmpnam(s));
+  ASSERT_MATCH(s1, "/tmp/.*");
+  ASSERT_MATCH(s2, "/tmp/.*");
+  ASSERT_STRNE(s1, s2);
+}
+
+TEST(STDIO_TEST, tmpnam) {
+  tmpnam_test(nullptr);
+}
+
+TEST(STDIO_TEST, tmpnam_buf) {
+  char buf[L_tmpnam];
+  tmpnam_test(buf);
 }
