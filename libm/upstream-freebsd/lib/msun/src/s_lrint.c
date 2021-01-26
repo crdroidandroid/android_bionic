@@ -3,6 +3,14 @@
 #include <math.h>
 #include <math_private.h>
 
+#ifndef type
+__FBSDID("$FreeBSD$");
+#define type		double
+#define	roundit		rint
+#define dtype		long
+#define	fn		lrint
+#endif
+
 /*
 If the result cannot be represented (overflow, nan), then
 lrint raises the invalid exception.
