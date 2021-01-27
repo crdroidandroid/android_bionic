@@ -1,5 +1,5 @@
 /*
- * Copyright (C) 2008 The Android Open Source Project
+ * Copyright (C) 2020 The Android Open Source Project
  * All rights reserved.
  *
  * Redistribution and use in source and binary forms, with or without
@@ -26,28 +26,10 @@
  * SUCH DAMAGE.
  */
 
-#include "asm_multiarch.h"
+#pragma once
 
-	.section .preinit_array, "aw"
-	ASM_ALIGN_TO_PTR_SIZE
-	ASM_PTR_SIZE(0)
+#include "bionic/tls.h"
 
-	.section .init_array, "aw"
-	ASM_ALIGN_TO_PTR_SIZE
-	ASM_PTR_SIZE(0)
-
-	.section .fini_array, "aw"
-	ASM_ALIGN_TO_PTR_SIZE
-	ASM_PTR_SIZE(0)
-
-#if defined(__linux__) && defined(__ELF__)
-	.section .note.GNU-stack,"",%progbits
-#endif
-#if !defined(__arm__)
-	.section	.eh_frame,"a",@progbits
-	.balign 4
-	.type	__FRAME_END__, @object
-	.size	__FRAME_END__, 4
-__FRAME_END__:
-	.zero	4
-#endif
+inline uintptr_t *getPlatformAllocatorTlsSlot() {
+  return reinterpret_cast<uintptr_t*>(&__get_tls()[TLS_SLOT_SANITIZER]);
+}
