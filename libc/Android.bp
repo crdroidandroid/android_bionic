@@ -175,6 +175,20 @@ libc32_scudo_product_variables = {
     },
 }
 
+libc_mimalloc_product_variables = {
+    malloc_not_svelte: {
+        cflags: ["-DUSE_MIMALLOC"],
+        whole_static_libs: [
+            "libmimalloc",
+            "libc_mimalloc_wrapper",
+        ],
+        exclude_static_libs: [
+            "libjemalloc5",
+            "libc_jemalloc_wrapper",
+        ],
+    },
+}
+
 
 // Defaults for native allocator libs/includes to make it
 // easier to change.
@@ -211,6 +225,23 @@ cc_library_static {
     // Used to pull in the jemalloc include directory so that if the
     // library is removed, the include directory is also removed.
     static_libs: ["libjemalloc5"],
+}
+
+// Functions not implemented by mimalloc directly, or that need to
+// be modified for Android.
+cc_library_static {
+    name: "libc_mimalloc_wrapper",
+    defaults: ["libc_defaults"],
+    srcs: ["bionic/mimalloc_wrapper.cpp"],
+    cflags: ["-fvisibility=hidden"],
+
+    // Used to pull in the mimalloc include directory so that if the
+    // library is removed, the include directory is also removed.
+    static_libs: ["libmimalloc"],
+
+    apex_available: [
+        "com.android.runtime",
+    ],
 }
 
 // ========================================================
@@ -2023,6 +2054,7 @@ cc_library_headers {
         "//external/arm-optimized-routines",
         "//external/gwp_asan",
         "//external/jemalloc_new",
+        "//external/mimalloc",
         "//external/libunwind_llvm",
         "//external/scudo",
         "//system/core/property_service/libpropertyinfoparser",
