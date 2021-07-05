@@ -1,7 +1,7 @@
 /*
  * memset - fill memory with a constant byte
  *
- * Copyright (c) 2012-2020, Arm Limited.
+ * Copyright (c) 2012-2021, Arm Limited.
  * SPDX-License-Identifier: MIT
  */
 
@@ -13,25 +13,13 @@
 
 #include <private/bionic_asm.h>
 
-/* By default we assume that the DC instruction can be used to zero
-   data blocks more efficiently.  In some circumstances this might be
-   unsafe, for example in an asymmetric multiprocessor environment with
-   different DC clear lengths (neither the upper nor lower lengths are
-   safe to use).
-
-   If code may be run in a virtualized environment, then define
-   MAYBE_VIRT.  This will cause the code to cache the system register
-   values rather than re-reading them each call.  */
-
-#define dstin		x0
-#define val		x1
-#define valw		w1
-#define count		x2
-#define dst 		x3
-#define dstend		x4
-#define zva_val		x5
-
-#define L(l) .L ## l
+#define dstin	x0
+#define val	x1
+#define valw	w1
+#define count	x2
+#define dst	x3
+#define dstend	x4
+#define zva_val	x5
 
 ENTRY(__memset_chk)
   cmp count, dst
@@ -46,7 +34,9 @@ ENTRY(__memset_chk)
   bl __memset_chk_fail
 END(__memset_chk)
 
-ENTRY(memset)
+ENTRY (memset)
+	PTR_ARG (0)
+	SIZE_ARG (2)
 
 	dup	v0.16B, valw
 	add	dstend, dstin, count
@@ -62,7 +52,7 @@ ENTRY(memset)
 	str	val, [dstin]
 	str	val, [dstend, -8]
 	ret
-	nop
+	.p2align 4
 1:	tbz	count, 2, 2f
 	str	valw, [dstin]
 	str	valw, [dstend, -4]
@@ -136,4 +126,5 @@ L(no_zva_loop):
 	stp	q0, q0, [dstend, -32]
 	ret
 
-END(memset)
+END (memset)
+

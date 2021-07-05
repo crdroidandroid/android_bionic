@@ -30,6 +30,6 @@
 
 #include <private/bionic_asm.h>
 
-ENTRY(__memcpy)
+ENTRY(memcpy)
   #include "memcpy_base.S"
-END(__memcpy)
+END(memcpy)

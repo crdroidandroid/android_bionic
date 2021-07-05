@@ -870,7 +870,9 @@ cc_library_static {
             srcs: [
                 "arch-arm64/generic/bionic/memcpy.S",
                 "arch-arm64/generic/bionic/memmove.S",
+                "arch-arm64/generic/bionic/memrchr.S",
                 "arch-arm64/generic/bionic/memset.S",
+                "arch-arm64/generic/bionic/strchrnul.S",
                 "arch-arm64/generic/bionic/wmemmove.S",
 
                 "arch-arm64/bionic/__bionic_clone.S",
@@ -1179,6 +1181,14 @@ cc_library_static {
         // which will be overridden by the actual one in libc.so.
         "bionic/icu_static.cpp",
     ],
+
+    arch: {
+        arm64: {
+            exclude_srcs: [
+                "bionic/strchrnul.cpp",
+            ],
+        },
+    },
 
     multilib: {
         lib32: {

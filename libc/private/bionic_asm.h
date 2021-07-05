@@ -83,4 +83,15 @@
     .globl alias; \
     .equ alias, original
 
+/* For arm-optimized-routines */
+#define L(l) .L ## l
+#ifdef __ILP32__
+  /* Sanitize padding bits of pointer arguments as per aapcs64 */
+#define PTR_ARG(n)  mov w##n, w##n
+#define SIZE_ARG(n)  mov w##n, w##n
+#else
+#define PTR_ARG(n)
+#define SIZE_ARG(n)
+#endif
+
 #endif
