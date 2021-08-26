@@ -29,8 +29,8 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 */
 
 /* Values are optimized for Core Architecture */
-#define SHARED_CACHE_SIZE (4096*1024)  /* Core Architecture L2 Cache */
-#define DATA_CACHE_SIZE   (24*1024)    /* Core Architecture L1 Data Cache */
+#define SHARED_CACHE_SIZE (4096 * 1024) /* Core Architecture L2 Cache */
+#define DATA_CACHE_SIZE (24 * 1024)     /* Core Architecture L1 Data Cache */
 
 #define SHARED_CACHE_SIZE_HALF (SHARED_CACHE_SIZE / 2)
-#define DATA_CACHE_SIZE_HALF   (DATA_CACHE_SIZE / 2)
+#define DATA_CACHE_SIZE_HALF (DATA_CACHE_SIZE / 2)
