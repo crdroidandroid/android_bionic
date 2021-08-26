@@ -63,7 +63,9 @@ DEFINE_IFUNC_FOR(memmove) {
 
 typedef void* memcpy_func(void*, const void*, size_t);
 DEFINE_IFUNC_FOR(memcpy) {
-    return memmove_resolver();
+  __builtin_cpu_init();
+  if (__builtin_cpu_supports("avx2")) RETURN_FUNC(memcpy_func, memcpy_avx2);
+  RETURN_FUNC(memcpy_func, memmove_generic);
 }
 
 typedef char* strcpy_func(char* __dst, const char* __src);
