@@ -31,7 +31,7 @@ SOFTWARE, EVEN IF ADVISED OF THE POSSIBILITY OF SUCH DAMAGE.
 #include "cache.h"
 
 #ifndef MEMCMP
-# define MEMCMP		memcmp
+# define MEMCMP		memcmp_generic
 #endif
 
 #ifndef L

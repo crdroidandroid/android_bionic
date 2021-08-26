@@ -367,6 +367,11 @@ cc_library_static {
                 "upstream-freebsd/lib/libc/string/wmemset.c",
             ],
         },
+        x86_64: {
+            exclude_srcs: [
+                "upstream-freebsd/lib/libc/string/wmemset.c",
+            ],
+        },
     },
 
     cflags: [
@@ -966,6 +971,7 @@ cc_library_static {
 
                 // avx2 functions
                 "arch-x86/kabylake/string/avx2-wmemset-kbl.S",
+                "arch-x86/kabylake/string/avx2-memcpy-kbl.S",
             ],
 
             exclude_srcs: [
@@ -975,20 +981,32 @@ cc_library_static {
             ],
         },
         x86_64: {
+            cflags: ["-include openbsd-compat.h"],
+            asflags: ["-Wno-unused-command-line-argument"],
+            include_dirs: ["bionic/libc/arch-x86_64/include"],
+            local_include_dirs: [
+                // "private",
+                 "upstream-openbsd/android/include",
+            ],
             srcs: [
-                "arch-x86_64/string/sse2-memmove-slm.S",
-                "arch-x86_64/string/sse2-memset-slm.S",
-                "arch-x86_64/string/sse2-stpcpy-slm.S",
-                "arch-x86_64/string/sse2-stpncpy-slm.S",
-                "arch-x86_64/string/sse2-strcat-slm.S",
-                "arch-x86_64/string/sse2-strcpy-slm.S",
-                "arch-x86_64/string/sse2-strlen-slm.S",
-                "arch-x86_64/string/sse2-strncat-slm.S",
-                "arch-x86_64/string/sse2-strncpy-slm.S",
-                "arch-x86_64/string/sse4-memcmp-slm.S",
-                "arch-x86_64/string/ssse3-strcmp-slm.S",
-                "arch-x86_64/string/ssse3-strncmp-slm.S",
-                "arch-x86_64/string/avx2-wmemset-kbl.S",
+                "arch-x86_64/generic/string/wmemset.c",
+
+                "arch-x86_64/silvermont/string/sse2-memmove-slm.S",
+                "arch-x86_64/silvermont/string/sse2-memcpy-slm.s",
+                "arch-x86_64/silvermont/string/sse2-memset-slm.S",
+                "arch-x86_64/silvermont/string/sse2-stpcpy-slm.S",
+                "arch-x86_64/silvermont/string/sse2-stpncpy-slm.S",
+                "arch-x86_64/silvermont/string/sse2-strcat-slm.S",
+                "arch-x86_64/silvermont/string/sse2-strcpy-slm.S",
+                "arch-x86_64/silvermont/string/sse2-strlen-slm.S",
+                "arch-x86_64/silvermont/string/sse2-strncat-slm.S",
+                "arch-x86_64/silvermont/string/sse2-strncpy-slm.S",
+                "arch-x86_64/silvermont/string/sse4-memcmp-slm.S",
+                "arch-x86_64/silvermont/string/ssse3-strcmp-slm.S",
+                "arch-x86_64/silvermont/string/ssse3-strncmp-slm.S",
+
+                "arch-x86_64/kabylake/string/avx2-wmemset-kbl.S",
+                "arch-x86_64/kabylake/string/avx2-memcpy-kbl.S",
 
                 "arch-x86_64/bionic/__bionic_clone.S",
                 "arch-x86_64/bionic/_exit_with_stack_teardown.S",
@@ -1502,6 +1520,9 @@ cc_library_static {
         x86: {
             srcs: ["arch-x86/static_function_dispatch.S"],
         },
+        x86_64: {
+            srcs: ["arch-x86_64/static_function_dispatch.S"],
+        },
         arm: {
             srcs: ["arch-arm/static_function_dispatch.S"],
         },
@@ -1526,6 +1547,9 @@ cc_library_static {
     arch: {
         x86: {
             srcs: ["arch-x86/dynamic_function_dispatch.cpp"],
+        },
+        x86_64: {
+            srcs: ["arch-x86_64/dynamic_function_dispatch.cpp"],
         },
         arm: {
             srcs: ["arch-arm/dynamic_function_dispatch.cpp"],
