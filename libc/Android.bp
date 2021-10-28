@@ -128,6 +128,10 @@ cc_defaults {
             cflags: ["-DSCUDO_PATTERN_FILL_CONTENTS"],
         },
     },
+
+    lto: {
+        never: true,
+    },
 }
 
 libc_scudo_product_variables = {
@@ -1824,9 +1828,6 @@ cc_library {
     // time, because small symbols are grouped together.
     sort_bss_symbols_by_size: true,
 
-    lto: {
-        never: true,
-    },
 }
 
 genrule {
