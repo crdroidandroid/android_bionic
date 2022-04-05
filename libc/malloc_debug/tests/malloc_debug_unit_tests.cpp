@@ -43,6 +43,7 @@
 
 #include <platform/bionic/macros.h>
 #include <private/bionic_malloc_dispatch.h>
+#include <tests/utils.h>
 
 #include "Config.h"
 #include "malloc_debug.h"
@@ -2060,6 +2061,7 @@ TEST_F(MallocDebugTest, max_size) {
 }
 
 TEST_F(MallocDebugTest, debug_mallinfo) {
+  SKIP_WITH_HWASAN;
   Init("guard");
 
   void* pointer = debug_malloc(150);
@@ -2472,6 +2474,7 @@ TEST_F(MallocDebugTest, abort_on_error_header_tag_corrupted) {
 }
 
 TEST_F(MallocDebugTest, malloc_info_no_pointer_tracking) {
+  SKIP_WITH_HWASAN;
   Init("fill");
 
   TemporaryFile tf;
