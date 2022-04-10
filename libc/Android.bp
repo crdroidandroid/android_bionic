@@ -205,14 +205,8 @@ cc_defaults {
         "libc_jemalloc_wrapper",
     ],
     header_libs: ["gwp_asan_headers"],
-    multilib: {
-        lib64: {
-            product_variables: libc_scudo_product_variables,
-        },
-        lib32: {
-            product_variables: libc32_scudo_product_variables,
-        }
-    },
+
+    product_variables: libc_mimalloc_product_variables,
 }
 
 // Functions not implemented by jemalloc directly, or that need to
