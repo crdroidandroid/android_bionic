@@ -127,8 +127,8 @@ static void apply_gnu_relro() {
       continue;
     }
 
-    ElfW(Addr) seg_page_start = PAGE_START(phdr->p_vaddr);
-    ElfW(Addr) seg_page_end = PAGE_END(phdr->p_vaddr + phdr->p_memsz);
+    ElfW(Addr) seg_page_start = page_start(phdr->p_vaddr);
+    ElfW(Addr) seg_page_end = page_end(phdr->p_vaddr + phdr->p_memsz);
 
     // Check return value here? What do we do if we fail?
     mprotect(reinterpret_cast<void*>(seg_page_start), seg_page_end - seg_page_start, PROT_READ);

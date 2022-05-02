@@ -38,6 +38,7 @@
 #include "private/ScopedSignalBlocker.h"
 #include "private/bionic_globals.h"
 #include "platform/bionic/macros.h"
+#include "platform/bionic/page.h"
 #include "private/bionic_tls.h"
 #include "pthread_internal.h"
 
@@ -81,7 +82,7 @@ bool __bionic_check_tls_alignment(size_t* alignment) {
     return false;
   }
   // Bionic only respects TLS alignment up to one page.
-  *alignment = MIN(*alignment, PAGE_SIZE);
+  *alignment = MIN(*alignment, page_size());
   return true;
 }
 

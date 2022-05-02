@@ -32,6 +32,7 @@
 #include <unistd.h>
 
 #include "platform/bionic/macros.h"
+#include "platform/bionic/page.h"
 #include "private/ErrnoRestorer.h"
 
 // mmap2(2) is like mmap(2), but the offset is in 4096-byte blocks, not bytes.
@@ -47,8 +48,8 @@ void* mmap64(void* addr, size_t size, int prot, int flags, int fd, off64_t offse
     return MAP_FAILED;
   }
 
-  // prevent allocations large enough for `end - start` to overflow
-  size_t rounded = __BIONIC_ALIGN(size, PAGE_SIZE);
+  // Prevent allocations large enough for `end - start` to overflow.
+  size_t rounded = __BIONIC_ALIGN(size, page_size());
   if (rounded < size || rounded > PTRDIFF_MAX) {
     errno = ENOMEM;
     return MAP_FAILED;
