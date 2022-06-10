@@ -410,7 +410,6 @@ cc_library_static {
                 "upstream-freebsd/lib/libc/string/wcscat.c",
                 "upstream-freebsd/lib/libc/string/wcscpy.c",
                 "upstream-freebsd/lib/libc/string/wmemcmp.c",
-                "upstream-freebsd/lib/libc/string/wmemset.c",
             ],
         },
     },
@@ -971,7 +970,6 @@ cc_library_static {
                 "arch-x86/generic/string/wcscat.c",
                 "arch-x86/generic/string/wcscpy.c",
                 "arch-x86/generic/string/wmemcmp.c",
-                "arch-x86/generic/string/wmemset.c",
 
                 "arch-x86/atom/string/sse2-memchr-atom.S",
                 "arch-x86/atom/string/sse2-memrchr-atom.S",
@@ -1021,9 +1019,6 @@ cc_library_static {
                 "arch-x86/atom/string/ssse3-strcpy-atom.S",
                 "arch-x86/atom/string/ssse3-strncpy-atom.S",
                 "arch-x86/atom/string/ssse3-wmemcmp-atom.S",
-
-                // avx2 functions
-                "arch-x86/kabylake/string/avx2-wmemset-kbl.S",
             ],
 
             exclude_srcs: [
@@ -1034,6 +1029,7 @@ cc_library_static {
         },
         x86_64: {
             srcs: [
+                "arch-x86_64/string/avx2-memset-kbl.S",
                 "arch-x86_64/string/sse2-memmove-slm.S",
                 "arch-x86_64/string/sse2-memset-slm.S",
                 "arch-x86_64/string/sse2-stpcpy-slm.S",
@@ -1046,7 +1042,6 @@ cc_library_static {
                 "arch-x86_64/string/sse4-memcmp-slm.S",
                 "arch-x86_64/string/ssse3-strcmp-slm.S",
                 "arch-x86_64/string/ssse3-strncmp-slm.S",
-                "arch-x86_64/string/avx2-wmemset-kbl.S",
 
                 "arch-x86_64/bionic/__bionic_clone.S",
                 "arch-x86_64/bionic/_exit_with_stack_teardown.S",
@@ -1560,6 +1555,9 @@ cc_library_static {
     name: "libc_static_dispatch",
 
     arch: {
+        x86_64: {
+            srcs: ["arch-x86_64/static_function_dispatch.S"],
+        },
         x86: {
             srcs: ["arch-x86/static_function_dispatch.S"],
         },
@@ -1585,6 +1583,9 @@ cc_library_static {
         "-fno-jump-tables",
     ],
     arch: {
+        x86_64: {
+            srcs: ["arch-x86_64/dynamic_function_dispatch.cpp"],
+        },
         x86: {
             srcs: ["arch-x86/dynamic_function_dispatch.cpp"],
         },
