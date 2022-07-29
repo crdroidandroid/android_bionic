@@ -70,8 +70,8 @@ int get_nprocs() {
     size_t len = 0;
     if (getline(&line, &len, fp) != -1) {
       cpu_count = GetCpuCountFromString(line);
-      free(line);
     }
+    free(line);
     fclose(fp);
   }
   return cpu_count;
