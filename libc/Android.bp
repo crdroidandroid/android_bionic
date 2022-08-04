@@ -1301,7 +1301,10 @@ cc_library_static {
 // ========================================================
 
 cc_library_static {
-    defaults: ["libc_defaults"],
+    defaults: [
+        "libc_defaults",
+        "target_alternative_futex_waiters_defaults"
+    ],
     srcs: [
         "bionic/bionic_elf_tls.cpp",
         "bionic/pthread_atfork.cpp",
