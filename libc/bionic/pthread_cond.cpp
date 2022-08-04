@@ -116,8 +116,12 @@ struct pthread_cond_internal_t {
   }
 
 #if defined(__LP64__)
+#if defined(TARGET_ALTERNATIVE_FUTEX_WAITERS)
+  char __reserved[44];
+#else
   atomic_uint waiters;
   char __reserved[40];
+#endif
 #endif
 };
 
@@ -143,7 +147,9 @@ int pthread_cond_init(pthread_cond_t* cond_interface, const pthread_condattr_t* 
   atomic_init(&cond->state, init_state);
 
 #if defined(__LP64__)
+#if !defined(TARGET_ALTERNATIVE_FUTEX_WAITERS)
   atomic_init(&cond->waiters, 0);
+#endif
 #endif
 
   return 0;
@@ -169,9 +175,11 @@ static int __pthread_cond_pulse(pthread_cond_internal_t* cond, int thread_count)
   // synchronization. And it doesn't help even if we use any fence here.
 
 #if defined(__LP64__)
+#if !defined(TARGET_ALTERNATIVE_FUTEX_WAITERS)
   if (atomic_load_explicit(&cond->waiters, memory_order_relaxed) == 0) {
     return 0;
   }
+#endif
 #endif
 
   // The increase of value should leave flags alone, even if the value can overflows.
@@ -191,7 +199,9 @@ static int __pthread_cond_timedwait(pthread_cond_internal_t* cond, pthread_mutex
   unsigned int old_state = atomic_load_explicit(&cond->state, memory_order_relaxed);
 
 #if defined(__LP64__)
+#if !defined(TARGET_ALTERNATIVE_FUTEX_WAITERS)
   atomic_fetch_add_explicit(&cond->waiters, 1, memory_order_relaxed);
+#endif
 #endif
 
   pthread_mutex_unlock(mutex);
@@ -199,7 +209,9 @@ static int __pthread_cond_timedwait(pthread_cond_internal_t* cond, pthread_mutex
                                use_realtime_clock, abs_timeout_or_null);
 
 #if defined(__LP64__)
+#if !defined(TARGET_ALTERNATIVE_FUTEX_WAITERS)
   atomic_fetch_sub_explicit(&cond->waiters, 1, memory_order_relaxed);
+#endif
 #endif
 
   pthread_mutex_lock(mutex);
