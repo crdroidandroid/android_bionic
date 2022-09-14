@@ -18,6 +18,7 @@
 
 #include <errno.h>
 #include <ifaddrs.h>
+#include <string.h>
 
 #include <gtest/gtest.h>
 
@@ -59,7 +60,9 @@ TEST(net_if, if_nameindex) {
   ifaddrs* ifa;
   ASSERT_EQ(0, getifaddrs(&ifa));
   for (ifaddrs* it = ifa; it != nullptr; it = it->ifa_next) {
-    getifaddrs_names.insert(it->ifa_name);
+    if (!strchr(it->ifa_name, ':')) {
+      getifaddrs_names.insert(it->ifa_name);
+    }
   }
   freeifaddrs(ifa);
 
