@@ -95,10 +95,6 @@ cc_defaults {
             cflags: ["-DANDROID_EXPERIMENTAL_MTE"],
         },
     },
-
-    lto: {
-        never: true,
-    },
 }
 
 libc_scudo_product_variables = {
@@ -1722,6 +1718,9 @@ cc_library {
     // time, because small symbols are grouped together.
     sort_bss_symbols_by_size: true,
 
+    lto: {
+        never: true,
+    },
 }
 
 genrule {
