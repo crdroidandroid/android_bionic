@@ -42,11 +42,6 @@ int mi_malloc_info(int /*options*/, FILE* /*fp*/) {
   return -1;
 }
 
-struct mallinfo mi_mallinfo() {
-  struct mallinfo info {};
-  return info;
-}
-
 // libmemunreachable is not supported
 void mi_malloc_disable() {
 }
