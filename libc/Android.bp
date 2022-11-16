@@ -393,11 +393,6 @@ cc_library_static {
         "upstream-freebsd/lib/libc/string/wmemset.c",
     ],
     arch: {
-        arm64: {
-            exclude_srcs: [
-                "upstream-freebsd/lib/libc/string/wmemmove.c",
-            ],
-        },
         x86: {
             exclude_srcs: [
                 "upstream-freebsd/lib/libc/string/wcschr.c",
@@ -939,7 +934,6 @@ cc_library_static {
                 "arch-arm64/generic/bionic/memcpy.S",
                 "arch-arm64/generic/bionic/memmove.S",
                 "arch-arm64/generic/bionic/memset.S",
-                "arch-arm64/generic/bionic/wmemmove.S",
                 "arch-arm64/kryo785/bionic/__memcpy.S",
                 "arch-arm64/kryo785/bionic/memcpy.S",
                 "arch-arm64/kryo785/bionic/memmove.S",
