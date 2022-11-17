@@ -838,8 +838,8 @@ cc_library_static {
         arm64: {
             cflags: ["-DHAVE_ASSEMBLER___MEMCPY_CHK"],
             srcs: [
-                "arch-arm64/generic/bionic/__memcpy_chk.S",
-                "arch-arm64/generic/bionic/__memset_chk.S",
+                "arch-arm64/string/__memcpy_chk.S",
+                "arch-arm64/string/__memset_chk.S",
             ],
             kryo: {
                 srcs: [
@@ -932,7 +932,6 @@ cc_library_static {
         },
         arm64: {
             srcs: [
-                "arch-arm64/generic/bionic/memset.S",
                 "arch-arm64/kryo785/bionic/__memcpy.S",
                 "arch-arm64/kryo785/bionic/memcpy.S",
                 "arch-arm64/kryo785/bionic/memmove.S",
@@ -944,7 +943,6 @@ cc_library_static {
                 "arch-arm64/bionic/vfork.S",
             ],
             exclude_srcs: [
-                "bionic/__memcpy_chk.cpp",
                 "bionic/strchr.cpp",
                 "bionic/strchrnul.cpp",
                 "bionic/strnlen.c",
