@@ -35,6 +35,8 @@ END(name)
 
 FUNCTION_DELEGATE(memchr, __memchr_aarch64_mte)
 FUNCTION_DELEGATE(stpcpy, __stpcpy_aarch64_mte)
+FUNCTION_DELEGATE(memcpy, __memcpy_aarch64)
+FUNCTION_DELEGATE(memmove, __memmove_aarch64)
 FUNCTION_DELEGATE(strchr, __strchr_aarch64_mte)
 FUNCTION_DELEGATE(strchrnul, __strchrnul_aarch64_mte)
 FUNCTION_DELEGATE(strcmp, __strcmp_aarch64_mte)
