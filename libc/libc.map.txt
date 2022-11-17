@@ -1574,14 +1574,10 @@ LIBC_T { # introduced=Tiramisu
     preadv64v2;
     pwritev2;
     pwritev64v2;
-} LIBC_S;
-
-LIBC_U { # introduced=UpsideDownCake
-  global:
     close_range;
     copy_file_range;
     memset_explicit;
-} LIBC_T;
+} LIBC_S;
 
 LIBC_PRIVATE {
   global:
