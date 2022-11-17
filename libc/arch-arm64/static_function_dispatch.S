@@ -34,11 +34,11 @@ ENTRY(name); \
 END(name)
 
 FUNCTION_DELEGATE(memchr, __memchr_aarch64_mte)
+FUNCTION_DELEGATE(memcpy, __memcpy_aarch64)
+FUNCTION_DELEGATE(memmove, __memmove_aarch64)
 FUNCTION_DELEGATE(strchr, __strchr_aarch64_mte)
 FUNCTION_DELEGATE(strchrnul, __strchrnul_aarch64_mte)
 FUNCTION_DELEGATE(strlen, __strlen_aarch64_mte)
 FUNCTION_DELEGATE(strrchr, __strrchr_aarch64_mte)
-FUNCTION_DELEGATE(memcpy, memcpy_generic)
-FUNCTION_DELEGATE(memmove, memmove_generic)
 
 NOTE_GNU_PROPERTY()
