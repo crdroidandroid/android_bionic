@@ -119,6 +119,38 @@ cc_defaults {
     // warning since this is intended right now.
     ldflags: ["-Wl,-z,muldefs"],
 
+<<<<<<< HEAD
+    multilib: {
+        lib64: {
+            product_variables: {
+                malloc_zero_contents: {
+                    cflags: ["-DSCUDO_ZERO_CONTENTS"],
+                },
+                malloc_pattern_fill_contents: {
+                    cflags: ["-DSCUDO_PATTERN_FILL_CONTENTS"],
+                },
+                malloc_not_svelte: {
+                    cflags: ["-DUSE_SCUDO"],
+                },
+            },
+        },
+        lib32: {
+            product_variables: {
+                malloc_zero_contents: {
+                    cflags: ["-DSCUDO_ZERO_CONTENTS"],
+                },
+                malloc_pattern_fill_contents: {
+                    cflags: ["-DSCUDO_PATTERN_FILL_CONTENTS"],
+                },
+                malloc_not_svelte_libc32: {
+                    cflags: ["-DUSE_SCUDO"],
+                },
+            },
+        },
+    },
+
+=======
+>>>>>>> 4d0e2c21e (bionic: Don't explicitly set scudo in common parts)
     lto: {
         never: true,
     },
@@ -126,11 +158,11 @@ cc_defaults {
 
 libc_scudo_product_variables = {
     malloc_zero_contents: {
-        cflags: ["-DSCUDO_ZERO_CONTENTS"],
-    },
-    malloc_pattern_fill_contents: {
-        cflags: ["-DSCUDO_PATTERN_FILL_CONTENTS"],
-    },
+            cflags: ["-DSCUDO_ZERO_CONTENTS"],
+        },
+        malloc_pattern_fill_contents: {
+            cflags: ["-DSCUDO_PATTERN_FILL_CONTENTS"],
+        },
     malloc_not_svelte: {
         cflags: ["-DUSE_SCUDO"],
         whole_static_libs: ["libscudo"],
@@ -142,12 +174,6 @@ libc_scudo_product_variables = {
 }
 
 libc32_scudo_product_variables = {
-    malloc_zero_contents: {
-        cflags: ["-DSCUDO_ZERO_CONTENTS"],
-    },
-    malloc_pattern_fill_contents: {
-        cflags: ["-DSCUDO_PATTERN_FILL_CONTENTS"],
-    },
     malloc_not_svelte_libc32: {
         cflags: ["-DUSE_SCUDO"],
         whole_static_libs: ["libscudo"],
@@ -1322,10 +1348,7 @@ cc_library_static {
 // ========================================================
 
 cc_library_static {
-    defaults: [
-        "libc_defaults",
-        "target_alternative_futex_waiters_defaults"
-    ],
+    defaults: ["libc_defaults"],
     srcs: [
         "bionic/bionic_elf_tls.cpp",
         "bionic/pthread_atfork.cpp",
