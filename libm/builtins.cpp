@@ -20,32 +20,9 @@
 
 #include <fenv.h>
 
-double fabs(double x) {
-#if __arm__
-  // Both Clang and GCC insist on moving r0/r1 into a double register
-  // and using fabs where bit-twiddling would be a better choice.
-  // They get fabsf right, but we need to be careful in fabsl too.
-  IEEEd2bits u;
-  u.d = x;
-  u.bits.sign = 0;
-  return u.d;
-#else
-  return __builtin_fabs(x);
-#endif
-}
-
-float fabsf(float x) {
-  return __builtin_fabsf(x);
-}
-
-#if defined(__LP64__)
+double fabs(double x) { return __builtin_fabs(x); }
+float fabsf(float x) { return __builtin_fabsf(x); }
 long double fabsl(long double x) { return __builtin_fabsl(x); }
-#else
-long double fabsl(long double x) {
-  // Don't use __builtin_fabs here because of ARM. (See fabs above.)
-  return fabs(x);
-}
-#endif
 
 // fma has builtin routines for ARMv7-A NEON, ARMv8, and ARM64
 
