@@ -57,7 +57,7 @@ DEFINE_IFUNC_FOR(memmove) {
     if (arg->_hwcap2 & HWCAP2_BTI) {
         RETURN_FUNC(memmove_func, memmove_opt);
     } else if (arg->_hwcap & HWCAP_ASIMD) {
-        RETURN_FUNC(memcpy_func, __memmove_aarch64_simd);
+        RETURN_FUNC(memmove_func, __memmove_aarch64_simd);
     } else {
         RETURN_FUNC(memmove_func, __memmove_aarch64);
     }
