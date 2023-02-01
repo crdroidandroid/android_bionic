@@ -24,39 +24,48 @@ double fabs(double x) { return __builtin_fabs(x); }
 float fabsf(float x) { return __builtin_fabsf(x); }
 long double fabsl(long double x) { return __builtin_fabsl(x); }
 
-// fma has builtin routines for ARMv7-A NEON, ARMv8, and ARM64
+#if defined (__AARCH32__) || defined (__aarch64__)
+float ceilf(float x) { return __builtin_ceilf(x); }
+double ceil(double x) { return __builtin_ceil(x); }
+#endif
+
+#if defined (__aarch64__)
+double copysign(double x, double y) { return __builtin_copysign(x, y); }
+float copysignf(float x, float y) { return __builtin_copysignf(x, y); }
+#endif
+
+#if defined (__AARCH32__) || defined (__aarch64__)
+float floorf(float x) { return __builtin_floorf(x); }
+double floor(double x) { return __builtin_floor(x); }
+#endif
 
 #if defined (__ARM_NEON__) || defined (__aarch64__)
 float fmaf(float x, float y, float z) { return __builtin_fmaf(x, y, z); }
 double fma(double x, double y, double z) { return __builtin_fma(x, y, z); }
 #endif
 
-// copysign/lround/llround have builtin routines on ARM64
-
-#if defined (__aarch64__)
-double copysign(double x, double y) { return __builtin_copysign(x, y); }
-float copysignf(float x, float y) { return __builtin_copysignf(x, y); }
-long lround(double x) { return __builtin_lround(x); }
-long lroundf(float x) { return __builtin_lroundf(x); }
-long long llround(double x) { return __builtin_llround(x); }
-long long llroundf(float x) { return __builtin_llroundf(x); }
-#endif
-
-// ceil/floor/fmax/fmin/nearbyint/rint/round/trunc have builtin routines for ARMv8 and ARM64
-
 #if defined (__AARCH32__) || defined (__aarch64__)
-float ceilf(float x) { return __builtin_ceilf(x); }
-double ceil(double x) { return __builtin_ceil(x); }
-
-float floorf(float x) { return __builtin_floorf(x); }
-double floor(double x) { return __builtin_floor(x); }
-
 float fmaxf(float x, float y) { return __builtin_fmaxf(x, y); }
 double fmax(double x, double y) { return __builtin_fmax(x, y); }
 
 float fminf(float x, float y) { return __builtin_fminf(x, y); }
 double fmin(double x, double y) { return __builtin_fmin(x, y); }
 
+#endif
+
+#if defined (__aarch64__)
+long lrint(double x) { return __builtin_lrint(x); }
+long lrintf(float x) { return __builtin_lrintf(x); }
+long long llrint(double x) { return __builtin_llrint(x); }
+long long llrintf(float x) { return __builtin_llrintf(x); }
+
+long lround(double x) { return __builtin_lround(x); }
+long lroundf(float x) { return __builtin_lroundf(x); }
+long long llround(double x) { return __builtin_llround(x); }
+long long llroundf(float x) { return __builtin_llroundf(x); }
+#endif
+
+#if defined (__AARCH32__) || defined (__aarch64__)
 float nearbyintf(float x) { return __builtin_nearbyintf(x); }
 double nearbyint(double x) { return __builtin_nearbyint(x); }
 
@@ -65,7 +74,14 @@ double rint(double x) { return __builtin_rint(x); }
 
 float roundf(float x) { return __builtin_roundf(x); }
 double round(double x) { return __builtin_round(x); }
+#endif
 
+#if defined(__aarch64__)
+float sqrtf(float x) { return __builtin_sqrtf(x); }
+double sqrt(double x) { return __builtin_sqrt(x); }
+#endif
+
+#if defined (__AARCH32__) || defined (__aarch64__)
 float truncf(float x) { return __builtin_truncf(x); }
 double trunc(double x) { return __builtin_trunc(x); }
 #endif
