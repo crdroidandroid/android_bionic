@@ -345,8 +345,6 @@ cc_library {
         arm64: {
             srcs: [
                 "arm64/fenv.c",
-                "arm64/lrint.S",
-                "arm64/sqrt.S",
             ],
             exclude_srcs: [
                 "upstream-freebsd/lib/msun/src/e_sqrt.c",
