@@ -129,9 +129,6 @@ cc_defaults {
                 malloc_pattern_fill_contents: {
                     cflags: ["-DSCUDO_PATTERN_FILL_CONTENTS"],
                 },
-                malloc_not_svelte: {
-                    cflags: ["-DUSE_SCUDO"],
-                },
             },
         },
         lib32: {
@@ -141,9 +138,6 @@ cc_defaults {
                 },
                 malloc_pattern_fill_contents: {
                     cflags: ["-DSCUDO_PATTERN_FILL_CONTENTS"],
-                },
-                malloc_not_svelte_libc32: {
-                    cflags: ["-DUSE_SCUDO"],
                 },
             },
         },
@@ -192,12 +186,7 @@ cc_defaults {
     ],
     header_libs: ["gwp_asan_headers"],
     multilib: {
-        lib64: {
-            product_variables: libc_scudo_product_variables,
-        },
-        lib32: {
-            product_variables: libc32_scudo_product_variables,
-        }
+        
     },
 }
 
