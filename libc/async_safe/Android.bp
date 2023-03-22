@@ -39,6 +39,9 @@ cc_library_static {
         "com.android.virt",
     ],
     min_sdk_version: "apex_inherit",
+    lto: {
+        full: true,
+    },
 }
 
 cc_library_headers {
