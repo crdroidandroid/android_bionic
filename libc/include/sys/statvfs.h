@@ -121,7 +121,7 @@ struct statvfs64 {
  *
  * Returns 0 on success, and returns -1 and sets `errno` on failure.
  */
-int statvfs(const char* __path, struct statvfs* __buf) __INTRODUCED_IN(19);
+int statvfs(const char* _Nonnull __path, struct statvfs* _Nonnull __buf) __INTRODUCED_IN(19);
 
 /**
  * [fstatvfs(3)](http://man7.org/linux/man-pages/man3/fstatvfs.3.html)
@@ -129,18 +129,18 @@ int statvfs(const char* __path, struct statvfs* __buf) __INTRODUCED_IN(19);
  *
  * Returns 0 on success, and returns -1 and sets `errno` on failure.
  */
-int fstatvfs(int __fd, struct statvfs* __buf) __INTRODUCED_IN(19);
+int fstatvfs(int __fd, struct statvfs* _Nonnull __buf) __INTRODUCED_IN(19);
 
 #endif
 
 #if __ANDROID_API__ >= 21
 // These functions are implemented as static inlines before API level 21.
 
-/** Equivalent to statvfs(). */
-int statvfs64(const char* __path, struct statvfs64* __buf) __INTRODUCED_IN(21);
+/** Equivalent to statvfs() . */
+int statvfs64(const char* _Nonnull __path, struct statvfs64* _Nonnull __buf) __INTRODUCED_IN(21);
 
 /** Equivalent to fstatvfs(). */
-int fstatvfs64(int __fd, struct statvfs64* __buf) __INTRODUCED_IN(21);
+int fstatvfs64(int __fd, struct statvfs64* _Nonnull __buf) __INTRODUCED_IN(21);
 
 #endif
 
