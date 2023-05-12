@@ -78,6 +78,8 @@
  * supplied in host order, and returned in network order (suitable for
  * use in system calls).
  */
+#pragma clang diagnostic push
+#pragma clang diagnostic ignored "-Wnullability-completeness"
 struct hostent {
 	char	*h_name;	/* official name of host */
 	char	**h_aliases;	/* alias list */
@@ -117,6 +119,7 @@ struct addrinfo {
 	struct	sockaddr *ai_addr;	/* binary address */
 	struct	addrinfo *ai_next;	/* next structure in linked list */
 };
+#pragma clang diagnostic pop
 
 /*
  * Error return codes from gethostbyname() and gethostbyaddr()
