@@ -2334,6 +2334,8 @@ cc_object {
         "bionic", // crtbegin.c includes bionic/libc_init_common.h
     ],
 
+    cflags: [ "-DCRTBEGIN_STATIC", ],
+
     srcs: ["arch-common/bionic/crtbegin.c"],
     objs: [
         "crtbrand",
