@@ -130,10 +130,6 @@ cc_defaults {
             cflags: ["-DUSE_SCUDO"],
         },
     },
-
-    lto: {
-        never: true,
-    },
 }
 
 libc_scudo_product_variables = {
@@ -1412,6 +1408,9 @@ cc_library_static {
         },
     },
     name: "libc_syscalls",
+    lto: {
+        never: true,
+    },
 }
 
 // ========================================================
@@ -1666,6 +1665,9 @@ cc_library_static {
         "libc_init_static",
         "libc_unwind_static",
     ],
+    lto: {
+        never: true,
+    },
 }
 
 filegroup {
