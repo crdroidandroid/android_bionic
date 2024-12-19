@@ -67,7 +67,6 @@ cc_library {
         "upstream-freebsd/lib/msun/src/e_lgammaf_r.c",
         "upstream-freebsd/lib/msun/src/e_lgamma_r.c",
         "upstream-freebsd/lib/msun/src/e_log10.c",
-        "upstream-freebsd/lib/msun/src/e_log10f.c",
         "upstream-freebsd/lib/msun/src/e_remainder.c",
         "upstream-freebsd/lib/msun/src/e_remainderf.c",
         "upstream-freebsd/lib/msun/src/e_rem_pio2.c",
