@@ -98,7 +98,11 @@ DEFINE_IFUNC_FOR(memset) {
   if (arg->_hwcap2 & HWCAP2_MOPS) {
     RETURN_FUNC(memset_func_t, __memset_aarch64_mops);
   } else if (__bionic_is_oryon(arg->_hwcap)) {
-    RETURN_FUNC(memset_func_t, __memset_aarch64_nt);
+      if (HWCAP_ASIMD) {
+        RETURN_FUNC(memset_func_t, __memset_aarch64_nt_simd);
+      } else {
+        RETURN_FUNC(memset_func_t, __memset_aarch64_nt);
+      }
   } else {
     RETURN_FUNC(memset_func_t, __memset_aarch64);
   }
