@@ -496,7 +496,7 @@ int hc_gethtbyname(const char *host, int af, struct getnamaddr *info)
 				if (naliases >= MAXALIASES)
 					goto nospc;
 			}
-			aligned = (char *)ALIGN(info->buf);
+			aligned = __builtin_align_up(info->buf, sizeof(uintptr_t));
 			if (info->buf != aligned) {
 				if ((ptrdiff_t)info->buflen < (aligned - info->buf))
 					goto nospc;
