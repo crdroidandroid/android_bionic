@@ -1614,6 +1614,7 @@ cc_library {
         export_llndk_headers: ["libc_headers"],
     },
     afdo: true,
+    lto_Instr100: true,
 }
 
 cc_library {
