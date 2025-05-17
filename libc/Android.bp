@@ -22,6 +22,7 @@ license {
 libc_common_flags = [
     "-D_LIBC=1",
     "-D__BIONIC_LP32_USE_STAT64",
+    "-O3",
     "-Wall",
     "-Wextra",
     "-Wunused",
@@ -58,6 +59,7 @@ cc_defaults {
         "-DUSE_SCUDO",
     ],
     asflags: libc_common_flags,
+    ldflags: ["-Wl,-O3"],
     conlyflags: ["-std=gnu99"],
     cppflags: [],
     include_dirs: [
