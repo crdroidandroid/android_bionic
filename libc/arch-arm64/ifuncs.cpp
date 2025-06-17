@@ -2,6 +2,9 @@
  * Copyright (C) 2019 The Android Open Source Project
  * All rights reserved.
  *
+ * Copyright (c) 2025 Qualcomm Innovation Center, Inc. All rights reserved.
+ *
+ *
  * Redistribution and use in source and binary forms, with or without
  * modification, are permitted provided that the following conditions
  * are met:
@@ -29,21 +32,23 @@
 #include <private/bionic_ifuncs.h>
 #include <stddef.h>
 
+// Accessors for the fields in MIDR_EL1.
+// https://developer.arm.com/documentation/ddi0601/latest/AArch64-Registers/MIDR-EL1--Main-ID-Register
+// https://www.kernel.org/doc/html/latest/arch/arm64/cpu-feature-registers.html#list-of-registers-with-visible-features
+inline int implementer(uint64_t midr_el1) { return (midr_el1 >> 24) & 0xff; }
+inline int variant(uint64_t midr_el1) { return (midr_el1 >> 20) & 0xf; }
+inline int part(uint64_t midr_el1) { return (midr_el1 >> 4) & 0xfff; }
+inline int revision(uint64_t midr_el1) { return (midr_el1 >> 0) & 0xf; }
+
 static inline bool __bionic_is_oryon(unsigned long hwcap) {
   if (!(hwcap & HWCAP_CPUID)) return false;
 
-  // Extract the implementor and variant bits from MIDR_EL1.
-  // https://www.kernel.org/doc/html/latest/arch/arm64/cpu-feature-registers.html#list-of-registers-with-visible-features
   unsigned long midr;
   __asm__ __volatile__("mrs %0, MIDR_EL1" : "=r"(midr));
-  uint16_t cpu = (midr >> 20) & 0xfff;
 
-  auto make_cpu = [](unsigned implementor, unsigned variant) {
-    return (implementor << 4) | variant;
-  };
-
-  // Check for implementor Qualcomm's variants 0x1..0x5 (Oryon).
-  return cpu >= make_cpu('Q', 0x1) && cpu <= make_cpu('Q', 0x5);
+  // Check for implementor Qualcomm's parts 0..15 (Oryon).
+  // Variant and revision are ignored.
+  return implementer(midr) == 'Q' && part(midr) <= 15;
 }
 
 extern "C" {
