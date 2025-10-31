@@ -49,21 +49,19 @@
 // part at offset 0, and pointers into its hidden tail.
 struct ifaddrs_storage {
   // Must come first, so that `ifaddrs_storage` is-a `ifaddrs`.
-  ifaddrs ifa;
+  ifaddrs ifa = {};
 
   // The interface index, so we can match RTM_NEWADDR messages with
   // earlier RTM_NEWLINK messages (to copy the interface flags).
-  int interface_index;
+  int interface_index = 0;
 
   // Storage for the pointers in `ifa`.
-  sockaddr_storage addr;
-  sockaddr_storage netmask;
-  sockaddr_storage ifa_ifu;
-  char name[IFNAMSIZ + 1];
+  sockaddr_storage addr = {};
+  sockaddr_storage netmask = {};
+  sockaddr_storage ifa_ifu = {};
+  char name[IFNAMSIZ + 1] = {};
 
   explicit ifaddrs_storage(ifaddrs** list) {
-    memset(this, 0, sizeof(*this));
-
     // push_front onto `list`.
     ifa.ifa_next = *list;
     *list = reinterpret_cast<ifaddrs*>(this);

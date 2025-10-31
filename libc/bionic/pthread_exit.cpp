@@ -90,8 +90,7 @@ __attribute__((no_sanitize("memtag"))) void pthread_exit(void* return_value) {
 
   if (thread->alternate_signal_stack != nullptr) {
     // Tell the kernel to stop using the alternate signal stack.
-    stack_t ss;
-    memset(&ss, 0, sizeof(ss));
+    stack_t ss = {};
     ss.ss_flags = SS_DISABLE;
     sigaltstack(&ss, nullptr);
 

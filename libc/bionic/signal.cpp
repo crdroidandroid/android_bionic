@@ -122,7 +122,7 @@ int SigEmptySet(SigSetT* set) {
     errno = EINVAL;
     return -1;
   }
-  memset(set, 0, sizeof(*set));
+  *set = {};
   return 0;
 }
 

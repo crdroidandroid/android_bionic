@@ -317,10 +317,9 @@ int FUNCTION_NAME(FILE* fp, const CHAR_TYPE* fmt0, va_list ap) {
         [[fallthrough]];
       case 'c':
         if (flags & LONGINT) {
-          mbstate_t mbs;
+          mbstate_t mbs = {};
           size_t mbseqlen;
 
-          memset(&mbs, 0, sizeof(mbs));
           mbseqlen = wcrtomb(buf, (wchar_t)GETARG(wint_t), &mbs);
           if (mbseqlen == (size_t)-1) {
             ret = -1;

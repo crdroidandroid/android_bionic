@@ -316,7 +316,7 @@ static int AllocId() {
     int result = AllocIdLocked();
     lock.unlock();
     if (result != -1) {
-        memset(&IdToPIMutex(result), 0, sizeof(PIMutex));
+      IdToPIMutex(result) = {};
     }
     return result;
 }
@@ -506,7 +506,7 @@ static inline pthread_mutex_internal_t* __get_internal_mutex(pthread_mutex_t* mu
 int pthread_mutex_init(pthread_mutex_t* mutex_interface, const pthread_mutexattr_t* attr) {
     pthread_mutex_internal_t* mutex = __get_internal_mutex(mutex_interface);
 
-    memset(mutex, 0, sizeof(pthread_mutex_internal_t));
+    *mutex = {};
 
     if (__predict_true(attr == nullptr)) {
       atomic_store_explicit(&mutex->state, MUTEX_TYPE_BITS_NORMAL, memory_order_relaxed);

@@ -120,7 +120,7 @@ struct __iconv_t {
   int Convert(char** src_buf0, size_t* src_bytes_left0, char** dst_buf0, size_t* dst_bytes_left0) {
     // Reset state.
     wc = 0;
-    memset(&ps, 0, sizeof(ps));
+    ps = {};
     replacement_count = 0;
     ignored = false;
     src_buf = src_buf0;

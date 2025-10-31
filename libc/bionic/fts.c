@@ -825,7 +825,7 @@ fts_stat(FTS *sp, FTSENT *p, int follow, int dfd)
 		}
 	} else if (fstatat(dfd, path, sbp, AT_SYMLINK_NOFOLLOW)) {
 		p->fts_errno = errno;
-err:		memset(sbp, 0, sizeof(struct stat));
+err:		*sbp = (struct stat){};
 		return (FTS_NS);
 	}
 

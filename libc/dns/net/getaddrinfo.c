@@ -602,7 +602,7 @@ android_getaddrinfofornetcontext(const char *hostname, const char *servname,
 	/* hints is allowed to be NULL */
 	assert(res != NULL);
 	assert(netcontext != NULL);
-	memset(&sentinel, 0, sizeof(sentinel));
+	sentinel = (typeof(sentinel)){};
 	cur = &sentinel;
 	pai = &ai;
 	pai->ai_flags = 0;
@@ -1331,7 +1331,7 @@ getanswer(const querybuf *answer, int anslen, const char *qname, int qtype,
 	assert(qname != NULL);
 	assert(pai != NULL);
 
-	memset(&sentinel, 0, sizeof(sentinel));
+	sentinel = (typeof(sentinel)){};
 	cur = &sentinel;
 
 	canonname = NULL;
@@ -1909,9 +1909,9 @@ _dns_getaddrinfo(void *rv, void	*cb_data, va_list ap)
 	netcontext = va_arg(ap, const struct android_net_context *);
 	//fprintf(stderr, "_dns_getaddrinfo() name = '%s'\n", name);
 
-	memset(&q, 0, sizeof(q));
-	memset(&q2, 0, sizeof(q2));
-	memset(&sentinel, 0, sizeof(sentinel));
+	q = (typeof(q)){};
+	q2 = (typeof(q2)){};
+	sentinel = (typeof(sentinel)){};
 	cur = &sentinel;
 
 	buf = malloc(sizeof(*buf));

@@ -73,8 +73,7 @@ class PropertyServiceConnection {
     }
 
     const size_t namelen = strlen(socket);
-    sockaddr_un addr;
-    memset(&addr, 0, sizeof(addr));
+    sockaddr_un addr = {};
     strlcpy(addr.sun_path, socket, sizeof(addr.sun_path));
     addr.sun_family = AF_LOCAL;
     socklen_t alen = namelen + offsetof(sockaddr_un, sun_path) + 1;
@@ -285,8 +284,7 @@ int __system_property_set(const char* key, const char* value) {
     if (strlen(key) >= PROP_NAME_MAX) return -1;
     if (strlen(value) >= PROP_VALUE_MAX) return -1;
 
-    prop_msg msg;
-    memset(&msg, 0, sizeof msg);
+    prop_msg msg = {};
     msg.cmd = PROP_MSG_SETPROP;
     strlcpy(msg.name, key, sizeof msg.name);
     strlcpy(msg.value, value, sizeof msg.value);

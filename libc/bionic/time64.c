@@ -361,7 +361,7 @@ static int safe_year(const Year year)
 
 static void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
     if( src == NULL ) {
-        memset(dest, 0, sizeof(*dest));
+        *dest = (typeof(*dest)){};
     }
     else {
 #       ifdef USE_TM64
@@ -393,7 +393,7 @@ static void copy_tm_to_TM(const struct tm *src, struct TM *dest) {
 
 static void copy_TM_to_tm(const struct TM *src, struct tm *dest) {
     if( src == NULL ) {
-        memset(dest, 0, sizeof(*dest));
+        *dest = (typeof(*dest)){};
     }
     else {
 #       ifdef USE_TM64
@@ -430,7 +430,7 @@ struct tm * fake_localtime_r(const time_t *clock, struct tm *result) {
     assert(result != NULL);
 
     if( static_result == NULL ) {
-        memset(result, 0, sizeof(*result));
+        *result = (typeof(*result)){};
         return NULL;
     }
     else {
@@ -448,7 +448,7 @@ struct tm * fake_gmtime_r(const time_t *clock, struct tm *result) {
     assert(result != NULL);
 
     if( static_result == NULL ) {
-        memset(result, 0, sizeof(*result));
+        *result = (typeof(*result)){};
         return NULL;
     }
     else {

@@ -42,7 +42,7 @@ constexpr int NUM_PORTS = (END_PORT - START_PORT);
 int bindresvport(int sd, struct sockaddr_in* sin) {
   sockaddr_in sin0;
   if (sin == nullptr) {
-    memset(&sin0, 0, sizeof(sin0));
+    sin0 = {};
     sin = &sin0;
     sin->sin_family = AF_INET;
   }

@@ -325,7 +325,7 @@ literal:
             buf[bytes++] = *fp->_p;
             fp->_p++;
             fp->_r--;
-            memset(&mbs, 0, sizeof(mbs));
+            mbs = {};
             nconv = mbrtowc(wcp, buf, bytes, &mbs);
             if (nconv == BIONIC_MULTIBYTE_RESULT_ILLEGAL_SEQUENCE) {
               fp->_flags |= __SERR;
@@ -415,7 +415,7 @@ literal:
             fp->_p++;
             fp->_r--;
             wchar_t wc = L'\0';
-            memset(&mbs, 0, sizeof(mbs));
+            mbs = {};
             nconv = mbrtowc(&wc, buf, bytes, &mbs);
             if (nconv == BIONIC_MULTIBYTE_RESULT_ILLEGAL_SEQUENCE) {
               fp->_flags |= __SERR;

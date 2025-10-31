@@ -583,7 +583,7 @@ android_read_hostent(FILE* proxy, struct hostent* hp, char* hbuf, size_t hbuflen
 	if (fread(&size, 1, sizeof(size), proxy) != sizeof(size)) return NULL;
 	size = ntohl(size);
 
-	memset(hp, 0, sizeof(*hp));
+	*hp = (typeof(*hp)){};
 	char *ptr = hbuf;
 	char *hbuf_end = hbuf + hbuflen;
 
@@ -1631,6 +1631,6 @@ gethostent(void)
 	    return NULL;
 	  }
 	}
-	memset(&rs->host, 0, sizeof(rs->host));
+	rs->host = (typeof(rs->host)){};
 	return netbsd_gethostent_r(rs->hostf, &rs->host, rs->hostbuf, sizeof(rs->hostbuf), &h_errno);
 }

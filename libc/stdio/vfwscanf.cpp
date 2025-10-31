@@ -345,7 +345,7 @@ int __vfwscanf(FILE* __restrict fp, const wchar_t* __restrict fmt, __va_list ap)
         } else {
           if (!(flags & SUPPRESS)) mbp = va_arg(ap, char*);
           n = 0;
-          memset(&mbs, 0, sizeof(mbs));
+          mbs = {};
           while (width != 0 && (wi = __fgetwc_unlock(fp)) != WEOF) {
             if (width >= MB_CUR_MAX && !(flags & SUPPRESS)) {
               nconv = wcrtomb(mbp, wi, &mbs);
@@ -389,7 +389,7 @@ int __vfwscanf(FILE* __restrict fp, const wchar_t* __restrict fmt, __va_list ap)
         } else {
           if (!(flags & SUPPRESS)) mbp = va_arg(ap, char*);
           n = 0;
-          memset(&mbs, 0, sizeof(mbs));
+          mbs = {};
           while ((wi = __fgetwc_unlock(fp)) != WEOF && width != 0 && ((c == CT_CCL && in_ccl(wi, ccl)) || (c == CT_STRING && !iswspace(wi)))) {
             if (width >= MB_CUR_MAX && !(flags & SUPPRESS)) {
               nconv = wcrtomb(mbp, wi, &mbs);

@@ -234,7 +234,7 @@ __res_vinit(res_state statp, int preinit) {
 	statp->_u._ext.nscount = 0;
 	statp->_u._ext.ext = malloc(sizeof(*statp->_u._ext.ext));
 	if (statp->_u._ext.ext != NULL) {
-	        memset(statp->_u._ext.ext, 0, sizeof(*statp->_u._ext.ext));
+	        *statp->_u._ext.ext = (typeof(*statp->_u._ext.ext)){};
 		statp->_u._ext.ext->nsaddrs[0].sin = statp->nsaddr;
 		strcpy(statp->_u._ext.ext->nsuffix, "ip6.arpa");
 		strcpy(statp->_u._ext.ext->nsuffix2, "ip6.int");

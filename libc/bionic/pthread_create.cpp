@@ -322,7 +322,7 @@ static int __allocate_thread(pthread_attr_t* attr, bionic_tcb** tcbp, void** chi
   if (!stack_clean) {
     // If thread was not allocated by mmap(), it may not have been cleared to zero.
     // So assume the worst and zero it.
-    memset(thread, 0, sizeof(pthread_internal_t));
+    *thread = {};
   }
 
   // Locate static TLS structures within the mapped region.

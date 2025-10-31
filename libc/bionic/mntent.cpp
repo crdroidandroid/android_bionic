@@ -37,7 +37,7 @@ mntent* getmntent(FILE* fp) {
 }
 
 mntent* getmntent_r(FILE* fp, struct mntent* e, char* buf, int buf_len) {
-  memset(e, 0, sizeof(*e));
+  *e = {};
   while (fgets(buf, buf_len, fp) != nullptr) {
     // Entries look like "proc /proc proc rw,nosuid,nodev,noexec,relatime 0 0".
     // That is: mnt_fsname mnt_dir mnt_type mnt_opts 0 0.

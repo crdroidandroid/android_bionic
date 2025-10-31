@@ -1199,7 +1199,7 @@ entry_init_key( Entry*  e, const void*  query, int  querylen )
 {
     DnsPacket  pack[1];
 
-    memset(e, 0, sizeof(*e));
+    *e = (typeof(*e)){};
 
     e->query    = query;
     e->querylen = querylen;
@@ -1866,7 +1866,7 @@ static void _res_cache_clear_stats_locked(struct resolv_cache_info* cache_info);
 static void
 _res_cache_init(void)
 {
-    memset(&_res_cache_list, 0, sizeof(_res_cache_list));
+    _res_cache_list = (typeof(_res_cache_list)){};
     pthread_mutex_init(&_res_cache_list_lock, NULL);
 }
 

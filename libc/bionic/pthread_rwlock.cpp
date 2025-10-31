@@ -227,7 +227,7 @@ static inline __always_inline pthread_rwlock_internal_t* __get_internal_rwlock(p
 int pthread_rwlock_init(pthread_rwlock_t* rwlock_interface, const pthread_rwlockattr_t* attr) {
   pthread_rwlock_internal_t* rwlock = __get_internal_rwlock(rwlock_interface);
 
-  memset(rwlock, 0, sizeof(pthread_rwlock_internal_t));
+  *rwlock = {};
 
   if (__predict_false(attr != nullptr)) {
     rwlock->pshared = __rwlockattr_getpshared(attr);

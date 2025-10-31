@@ -166,7 +166,7 @@ random_bind( int  s, int  family )
     socklen_t        slen;
 
     /* clear all, this also sets the IP4/6 address to 'any' */
-    memset( &u, 0, sizeof u );
+    u = (typeof(u)){};
 
     switch (family) {
         case AF_INET:

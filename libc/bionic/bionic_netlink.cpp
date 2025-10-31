@@ -64,8 +64,7 @@ bool NetlinkConnection::SendRequest(int type) {
   struct NetlinkMessage {
     nlmsghdr hdr;
     rtgenmsg msg;
-  } request;
-  memset(&request, 0, sizeof(request));
+  } request = {};
   request.hdr.nlmsg_flags = NLM_F_DUMP | NLM_F_REQUEST;
   request.hdr.nlmsg_type = type;
   request.hdr.nlmsg_len = sizeof(request);
