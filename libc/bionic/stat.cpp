@@ -26,12 +26,19 @@
  * SUCH DAMAGE.
  */
 
+#include <errno.h>
 #include <fcntl.h>
 #include <sys/stat.h>
 #include <sys/types.h>
 #include <unistd.h>
 
+#include "custom_rom_hide.h"
+
 int stat(const char* path, struct stat* sb) {
+  if (custom_rom_hide_should_block(path)) {
+    errno = ENOENT;
+    return -1;
+  }
   return fstatat(AT_FDCWD, path, sb, 0);
 }
 __strong_alias(stat64, stat);

@@ -30,6 +30,8 @@
 #include <unistd.h>
 #include <errno.h>
 
+#include "custom_rom_hide.h"
+
 extern "C" int __faccessat(int, const char*, int);
 
 int faccessat(int dirfd, const char* pathname, int mode, int flags) {
@@ -53,6 +55,11 @@ int faccessat(int dirfd, const char* pathname, int mode, int flags) {
     // We could use faccessat2(2) from Linux 5.8, but since we don't want the
     // first feature and don't need the second, we just reject such requests.
     errno = EINVAL;
+    return -1;
+  }
+
+  if (custom_rom_hide_should_block_at(dirfd, pathname)) {
+    errno = ENOENT;
     return -1;
   }
 
