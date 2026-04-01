@@ -24,6 +24,7 @@ __BEGIN_DECLS
 bool custom_rom_hide_should_block(const char* path);
 bool custom_rom_hide_should_block_at(int dirfd, const char* path);
 bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name);
+int custom_rom_hide_filter_vintf(const char* path);
 int custom_rom_hide_filter_proc(const char* path);
 int custom_rom_hide_filter_sepolicy(const char* path);
 bool custom_rom_hide_should_spoof_prop(const char* name, char* value);

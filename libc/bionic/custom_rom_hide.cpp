@@ -419,6 +419,91 @@ int custom_rom_hide_filter_sepolicy(const char* path) {
     return mem_fd;
 }
 
+static const char* const kVintfFilterPaths[] = {
+    "/system/etc/vintf/compatibility_matrix.xml",
+    "/system/etc/vintf/compatibility_matrix.device.xml",
+    "/vendor/etc/vintf/compatibility_matrix.xml",
+    "/vendor/etc/vintf/compatibility_matrix.device.xml",
+    "/product/etc/vintf/compatibility_matrix.xml",
+    "/product/etc/vintf/compatibility_matrix.device.xml",
+    "/system_ext/etc/vintf/compatibility_matrix.xml",
+    "/system_ext/etc/vintf/compatibility_matrix.device.xml",
+    "/odm/etc/vintf/compatibility_matrix.xml",
+    "/odm/etc/vintf/compatibility_matrix.device.xml",
+    "/system/etc/vintf/manifest.xml",
+    "/vendor/etc/vintf/manifest.xml",
+    "/product/etc/vintf/manifest.xml",
+    "/system_ext/etc/vintf/manifest.xml",
+    "/odm/etc/vintf/manifest.xml",
+    nullptr
+};
+
+static const char* const kVintfFilterKeywords[] = {
+    "lineage",
+    "Lineage",
+    "crdroid",
+    "crDroid",
+    nullptr
+};
+
+static bool is_vintf_filter_path(const char* path) {
+    for (const char* const* p = kVintfFilterPaths; *p; ++p) {
+        if (strcmp(path, *p) == 0) return true;
+    }
+    return false;
+}
+
+int custom_rom_hide_filter_vintf(const char* path) {
+    if (!is_app_process()) return -1;
+    if (!is_vintf_filter_path(path)) return -1;
+
+    size_t file_size = 0;
+    char* content = read_file_raw(path, &file_size);
+    if (!content) return -1;
+
+    int mem_fd = raw_memfd_create("vintf", 0);
+    if (mem_fd < 0) {
+        free(content);
+        return -1;
+    }
+
+    int skip_depth = 0;
+
+    char* pos = content;
+    while (*pos) {
+        char* eol = strchr(pos, '\n');
+        size_t line_len = eol ? static_cast<size_t>(eol - pos + 1) : strlen(pos);
+
+        char saved = pos[line_len];
+        pos[line_len] = '\0';
+
+        bool keyword_hit = line_contains_any(pos, kVintfFilterKeywords);
+
+        bool opens_block  = strstr(pos, "<hal")        != nullptr
+                         || strstr(pos, "<interface")   != nullptr;
+        bool closes_block = strstr(pos, "</hal>")       != nullptr
+                         || strstr(pos, "</interface>") != nullptr;
+
+        if (skip_depth > 0) {
+            if (opens_block)  skip_depth++;
+            if (closes_block) skip_depth--;
+        } else if (keyword_hit) {
+            if (opens_block && !closes_block) {
+                skip_depth = 1;
+            }
+        } else {
+            raw_write(mem_fd, pos, line_len);
+        }
+
+        pos[line_len] = saved;
+        pos += line_len;
+    }
+
+    free(content);
+    raw_lseek(mem_fd, 0, SEEK_SET);
+    return mem_fd;
+}
+
 static const char* const kSpoofedEmptyProps[] = {
     "ro.crdroid.version",
     "ro.lineage.version",
