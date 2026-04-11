@@ -169,13 +169,14 @@ static bool resolve_fd_path(int fd, char* buf, size_t size) {
 }
 
 bool custom_rom_hide_should_block(const char* path) {
-    if (!path || path[0] != '/') return false;
+    if (!path || reinterpret_cast<uintptr_t>(path) < 0x10000) return false;
+    if (path[0] != '/') return false;
     if (!is_app_process()) return false;
     return is_rom_path(path);
 }
 
 bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
-    if (!path) return false;
+    if (!path || reinterpret_cast<uintptr_t>(path) < 0x10000) return false;
 
     if (path[0] == '/') {
         return custom_rom_hide_should_block(path);
@@ -192,7 +193,8 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
 }
 
 bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
-    if (!name || !is_app_process()) return false;
+    if (!name || reinterpret_cast<uintptr_t>(name) < 0x10000) return false;
+    if (!is_app_process()) return false;
 
     char dir_path[256];
     if (!resolve_fd_path(dirfd, dir_path, sizeof(dir_path))) return false;
@@ -217,7 +219,7 @@ enum ProcFilterType {
 };
 
 static ProcFilterType get_proc_filter_type(const char* path) {
-    if (!path) return PROC_FILTER_NONE;
+    if (!path || reinterpret_cast<uintptr_t>(path) < 0x10000) return PROC_FILTER_NONE;
 
     char pid_path[64];
     snprintf(pid_path, sizeof(pid_path), "/proc/%d/", static_cast<int>(getpid()));
@@ -337,6 +339,7 @@ static int filter_file_lines(const char* path, ProcFilterType type) {
 }
 
 int custom_rom_hide_filter_proc(const char* path) {
+    if (!path || reinterpret_cast<uintptr_t>(path) < 0x10000) return -1;
     if (!is_app_process()) return -1;
 
     ProcFilterType type = get_proc_filter_type(path);
@@ -377,6 +380,7 @@ static bool is_sepolicy_context_file(const char* path) {
 }
 
 int custom_rom_hide_filter_sepolicy(const char* path) {
+    if (!path || reinterpret_cast<uintptr_t>(path) < 0x10000) return -1;
     if (!is_app_process()) return -1;
     if (!is_sepolicy_context_file(path)) return -1;
 
@@ -454,6 +458,7 @@ static bool is_vintf_filter_path(const char* path) {
 }
 
 int custom_rom_hide_filter_vintf(const char* path) {
+    if (!path || reinterpret_cast<uintptr_t>(path) < 0x10000) return -1;
     if (!is_app_process()) return -1;
     if (!is_vintf_filter_path(path)) return -1;
 
@@ -534,7 +539,8 @@ static const PropOverride kSpoofedValueProps[] = {
 };
 
 bool custom_rom_hide_should_spoof_prop(const char* name, char* value) {
-    if (!name || !is_app_process()) return false;
+    if (!name || reinterpret_cast<uintptr_t>(name) < 0x10000) return false;
+    if (!is_app_process()) return false;
 
     for (const char* const* p = kSpoofedEmptyProps; *p; ++p) {
         if (strcmp(name, *p) == 0) {
@@ -554,7 +560,8 @@ bool custom_rom_hide_should_spoof_prop(const char* name, char* value) {
 }
 
 bool custom_rom_hide_should_hide_prop(const char* name) {
-    if (!name || !is_app_process()) return false;
+    if (!name || reinterpret_cast<uintptr_t>(name) < 0x10000) return false;
+    if (!is_app_process()) return false;
 
     for (const char* const* p = kSpoofedEmptyProps; *p; ++p) {
         if (strcmp(name, *p) == 0) return true;
@@ -563,7 +570,8 @@ bool custom_rom_hide_should_hide_prop(const char* name) {
 }
 
 const char* custom_rom_hide_get_prop_override(const char* name) {
-    if (!name || !is_app_process()) return nullptr;
+    if (!name || reinterpret_cast<uintptr_t>(name) < 0x10000) return nullptr;
+    if (!is_app_process()) return nullptr;
 
     for (const PropOverride* o = kSpoofedValueProps; o->name; ++o) {
         if (strcmp(name, o->name) == 0) return o->value;
