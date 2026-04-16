@@ -167,7 +167,7 @@ fstatat64|fstatat:newfstatat(int, const char*, struct stat*, int)  lp64
 linkat(int, const char*, int, const char*, int)  all
 mkdirat(int, const char*, mode_t)  all
 mknodat(int, const char*, mode_t, dev_t)  all
-readlinkat(int, const char*, char*, size_t)  all
+__readlinkat:readlinkat(int, const char*, char*, size_t)  all
 renameat2(int, const char*, int, const char*, unsigned)  all
 symlinkat(const char*, int, const char*)  all
 unlinkat(int, const char*, int)   all
@@ -228,7 +228,7 @@ listxattr(const char*, char*, size_t) all
 llistxattr(const char*, char*, size_t) all
 removexattr(const char*, const char*) all
 lremovexattr(const char*, const char*) all
-statx(int, const char*, int, unsigned, struct statx*) all
+__statx:statx(int, const char*, int, unsigned, struct statx*) all
 swapon(const char*, int) all
 swapoff(const char*) all
 

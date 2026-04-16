@@ -92,16 +92,40 @@ struct ReadCallbackOverrideCtx {
 static void read_callback_intercept(void* cookie, const char* name, const char* value,
                                     uint32_t serial) {
     auto* ctx = static_cast<ReadCallbackOverrideCtx*>(cookie);
-    if (custom_rom_hide_should_hide_prop(name)) {
-        ctx->original_callback(ctx->original_cookie, name, "", serial);
+
+    if (!custom_rom_hide_is_app_process()) {
+        ctx->original_callback(ctx->original_cookie, name, value, serial);
         return;
     }
+
+    bool is_ro = (strncmp(name, "ro.", 3) == 0);
+
+    if (custom_rom_hide_should_hide_prop(name)) {
+        uint32_t fake_serial = is_ro ? 0 : (serial & 0xffffff);
+        ctx->original_callback(ctx->original_cookie, name, "", fake_serial);
+        return;
+    }
+
     const char* override_val = custom_rom_hide_get_prop_override(name);
     if (override_val) {
-        ctx->original_callback(ctx->original_cookie, name, override_val, serial);
-    } else {
-        ctx->original_callback(ctx->original_cookie, name, value, serial);
+        uint32_t len = strlen(override_val);
+        uint32_t fake_serial = serial;
+        if (is_ro) {
+            fake_serial = (len < PROP_VALUE_MAX) ? (len << 24) : ((50 << 24) | (1 << 16));
+        } else {
+            fake_serial = (serial & 0xffffff) | (len << 24);
+        }
+        ctx->original_callback(ctx->original_cookie, name, override_val, fake_serial);
+        return;
     }
+
+    uint32_t final_serial = serial;
+    if (is_ro) {
+        uint32_t len = strlen(value);
+        final_serial = (len < PROP_VALUE_MAX) ? (len << 24) : ((50 << 24) | (1 << 16));
+    }
+
+    ctx->original_callback(ctx->original_cookie, name, value, final_serial);
 }
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
@@ -141,7 +165,38 @@ uint32_t __system_property_serial(const prop_info* pi) {
   // __system_property_serial enforcing memory order, e.g., in case
   // someone spins on the result of this function changing before
   // loading some value.
-  return atomic_load_explicit(&pi->serial, memory_order_acquire);
+  if (!pi) return 0;
+  uint32_t real_serial = atomic_load_explicit(&pi->serial, memory_order_acquire);
+
+  if (!custom_rom_hide_is_app_process()) return real_serial;
+
+  const char* name = pi->name;
+  bool is_ro = (strncmp(name, "ro.", 3) == 0);
+
+  if (custom_rom_hide_should_hide_prop(name)) {
+      return is_ro ? 0 : (real_serial & 0xffffff);
+  }
+
+  const char* override_val = custom_rom_hide_get_prop_override(name);
+  if (override_val) {
+      uint32_t len = strlen(override_val);
+      if (is_ro) {
+          return (len < PROP_VALUE_MAX) ? (len << 24) : ((50 << 24) | (1 << 16));
+      } else {
+          return (real_serial & 0xffffff) | (len << 24);
+      }
+  }
+
+  if (is_ro) {
+      if ((real_serial & (1 << 16)) != 0) {
+          return (50 << 24) | (1 << 16);
+      } else {
+          uint32_t len = real_serial >> 24;
+          return len << 24;
+      }
+  }
+
+  return real_serial;
 }
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE

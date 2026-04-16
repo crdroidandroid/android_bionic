@@ -34,11 +34,29 @@
 
 #include "custom_rom_hide.h"
 
+extern "C" int __statx(int, const char*, int, unsigned, struct statx*);
+
 int stat(const char* path, struct stat* sb) {
   if (custom_rom_hide_should_block(path)) {
     errno = ENOENT;
     return -1;
   }
-  return fstatat(AT_FDCWD, path, sb, 0);
+  int res = fstatat(AT_FDCWD, path, sb, 0);
+  if (res == 0) {
+    custom_rom_hide_spoof_stat(path, sb);
+  }
+  return res;
 }
 __strong_alias(stat64, stat);
+
+int statx(int dirfd, const char* path, int flags, unsigned mask, struct statx* buf) {
+  if (custom_rom_hide_should_block_at(dirfd, path)) {
+    errno = ENOENT;
+    return -1;
+  }
+  int res = __statx(dirfd, path, flags, mask, buf);
+  if (res == 0) {
+    custom_rom_hide_spoof_statx(path, buf);
+  }
+  return res;
+}
