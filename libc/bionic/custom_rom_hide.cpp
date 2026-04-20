@@ -49,18 +49,6 @@ static const char* const kDirParents[] = {
     nullptr
 };
 
-static const char* const kBlockedExactPaths[] = {
-    "/system/bin/install-recovery.sh",
-    "/sbin/recovery",
-    "/tmp/recovery.log",
-    nullptr
-};
-
-static const PrefixEntry kRecoveryPrefixes[] = {
-    PE("/cache/recovery/"),
-    {nullptr, 0}
-};
-
 static const char* const kProcFilterKeywords[] = {
     "lineage", "Lineage", "crdroid", "crDroid", "omnirom",
     "aospa",
@@ -154,14 +142,6 @@ static bool is_rom_path(const char* path) {
         while (len > 1 && stack_buf[len - 1] == '/') len--;
         stack_buf[len] = '\0';
         clean = stack_buf;
-    }
-
-    for (const char* const* p = kBlockedExactPaths; *p; ++p) {
-        if (strcmp(clean, *p) == 0) return true;
-    }
-
-    for (const PrefixEntry* p = kRecoveryPrefixes; p->str; ++p) {
-        if (strncmp(clean, p->str, p->len) == 0) return true;
     }
 
     if (is_blocked_dir(clean)) return true;
