@@ -227,6 +227,29 @@ do {								\
   (d) = sf_u.value;						\
 } while (0)
 
+
+/* Convert integer number X, unbiased exponent EP, and sign S to double:
+
+   result = X * 2^(EP+1 - exponent_bias)
+
+   NB: zero is not supported.  */
+static inline double
+make_float (uint32_t x, int ep, uint32_t s)
+{
+  int lz = __builtin_clz (x) - 8;
+  x <<= lz;
+  ep -= lz;
+
+  if(ep < 0 || x == 0)
+    {
+      x >>= -ep;
+      ep = 0;
+    }
+  float result_mk_float;
+  SET_FLOAT_WORD(result_mk_float, (s + x + (ep << 23)));
+  return result_mk_float;
+}
+
 /*
  * Get expsign and mantissa as 16 bit and 64 bit ints from an 80 bit long
  * double.
