@@ -215,9 +215,27 @@ const prop_info* __system_property_find_nth(unsigned n) {
   return system_properties.FindNth(n);
 }
 
+struct ForeachOverrideCtx {
+    void (*original_callback)(const prop_info* pi, void* cookie);
+    void* original_cookie;
+};
+
+static void foreach_callback_intercept(const prop_info* pi, void* cookie) {
+    auto* ctx = static_cast<ForeachOverrideCtx*>(cookie);
+    char name_buf[PROP_NAME_MAX];
+    char value_buf[PROP_VALUE_MAX];
+    __system_property_read(pi, name_buf, value_buf);
+    if (custom_rom_hide_should_hide_prop(name_buf)) {
+        return;
+    }
+    ctx->original_callback(pi, ctx->original_cookie);
+}
+
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
 int __system_property_foreach(void (*propfn)(const prop_info* pi, void* cookie), void* cookie) {
-  return system_properties.Foreach(propfn, cookie);
+    if (!propfn) return -1;
+    ForeachOverrideCtx ctx{propfn, cookie};
+    return system_properties.Foreach(foreach_callback_intercept, &ctx);
 }
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
