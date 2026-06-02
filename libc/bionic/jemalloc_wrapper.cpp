@@ -80,7 +80,7 @@ int je_mallopt(int param, int value) {
       // sufficiently large number that essentially disables the decay timer.
       decay_time_ms = 10000000;
     } else if (value) {
-      decay_time_ms = 1000;
+      decay_time_ms = 5000;
     } else {
       decay_time_ms = 0;
     }
