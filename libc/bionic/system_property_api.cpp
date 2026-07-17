@@ -220,15 +220,23 @@ struct ForeachOverrideCtx {
     void* original_cookie;
 };
 
-static void foreach_callback_intercept(const prop_info* pi, void* cookie) {
-    auto* ctx = static_cast<ForeachOverrideCtx*>(cookie);
-    char name_buf[PROP_NAME_MAX];
-    char value_buf[PROP_VALUE_MAX];
-    __system_property_read(pi, name_buf, value_buf);
-    if (custom_rom_hide_should_hide_prop(name_buf)) {
+struct ForeachReadCtx {
+    const prop_info* pi;
+    ForeachOverrideCtx* foreach_ctx;
+};
+
+static void foreach_read_callback(void* cookie, const char* name, const char*, uint32_t) {
+    auto* ctx = static_cast<ForeachReadCtx*>(cookie);
+    if (custom_rom_hide_should_hide_prop(name)) {
         return;
     }
-    ctx->original_callback(pi, ctx->original_cookie);
+    ctx->foreach_ctx->original_callback(ctx->pi, ctx->foreach_ctx->original_cookie);
+}
+
+static void foreach_callback_intercept(const prop_info* pi, void* cookie) {
+    auto* ctx = static_cast<ForeachOverrideCtx*>(cookie);
+    ForeachReadCtx read_ctx{pi, ctx};
+    system_properties.ReadCallback(pi, foreach_read_callback, &read_ctx);
 }
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
