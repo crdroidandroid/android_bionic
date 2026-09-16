@@ -212,7 +212,20 @@ bool __system_property_wait(const prop_info* pi, uint32_t old_serial, uint32_t* 
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
 const prop_info* __system_property_find_nth(unsigned n) {
-  return system_properties.FindNth(n);
+  if (!custom_rom_hide_is_app_process()) {
+    return system_properties.FindNth(n);
+  }
+
+  // Keep indexed enumeration consistent with __system_property_foreach():
+  // properties hidden from sandboxed apps must not remain discoverable merely
+  // because a caller chose the deprecated find_nth API.
+  for (unsigned real_index = 0, visible_index = 0;; ++real_index) {
+    const prop_info* pi = system_properties.FindNth(real_index);
+    if (pi == nullptr) return nullptr;
+
+    if (custom_rom_hide_should_hide_prop(pi->name)) continue;
+    if (visible_index++ == n) return pi;
+  }
 }
 
 struct ForeachOverrideCtx {

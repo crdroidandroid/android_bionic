@@ -92,6 +92,70 @@ static const PartitionDevEntry kPartitionDmMap[] = {
 };
 
 static _Atomic(uint64_t) g_substituted_fd_bits[HIDE_TRACKED_FD_WORD_COUNT];
+static _Atomic(bool) g_custom_rom_hide_enabled = false;
+static _Atomic(bool) g_adb_enabled = false;
+static _Atomic(bool) g_selinux_enforcing_enabled = false;
+
+static constexpr char kPrivacyEnvName[] = "BIONIC_AX_SANDBOX_PRIVACY";
+static constexpr char kAdbEnvName[] = "BIONIC_AX_SANDBOX_ADB";
+static constexpr char kSelinuxEnforcingEnvName[] =
+        "BIONIC_AX_SANDBOX_SELINUX_ENFORCING";
+
+void custom_rom_hide_set_enabled(bool enabled) {
+    atomic_store_explicit(&g_custom_rom_hide_enabled, enabled, memory_order_release);
+}
+
+bool custom_rom_hide_is_enabled() {
+    if (atomic_load_explicit(&g_custom_rom_hide_enabled, memory_order_acquire)) return true;
+
+    const char* inherited = getenv(kPrivacyEnvName);
+    if (inherited == nullptr || strcmp(inherited, "1") != 0) return false;
+
+    atomic_store_explicit(&g_custom_rom_hide_enabled, true, memory_order_release);
+    return true;
+}
+
+void custom_rom_hide_set_adb_enabled(bool enabled) {
+    atomic_store_explicit(&g_adb_enabled, enabled, memory_order_release);
+}
+
+bool custom_rom_hide_is_adb_enabled() {
+    if (atomic_load_explicit(&g_adb_enabled, memory_order_acquire)) return true;
+
+    const char* inherited = getenv(kAdbEnvName);
+    if (inherited == nullptr || strcmp(inherited, "1") != 0) return false;
+
+    atomic_store_explicit(&g_adb_enabled, true, memory_order_release);
+    atomic_store_explicit(&g_custom_rom_hide_enabled, true, memory_order_release);
+    return true;
+}
+
+void custom_rom_hide_set_selinux_enforcing_enabled(bool enabled) {
+    atomic_store_explicit(&g_selinux_enforcing_enabled, enabled, memory_order_release);
+}
+
+bool custom_rom_hide_is_selinux_enforcing_enabled() {
+    if (atomic_load_explicit(&g_selinux_enforcing_enabled, memory_order_acquire)) return true;
+
+    const char* inherited = getenv(kSelinuxEnforcingEnvName);
+    if (inherited == nullptr || strcmp(inherited, "1") != 0) return false;
+
+    atomic_store_explicit(&g_selinux_enforcing_enabled, true, memory_order_release);
+    atomic_store_explicit(&g_custom_rom_hide_enabled, true, memory_order_release);
+    return true;
+}
+
+bool custom_rom_hide_should_propagate_selinux_enforcing() {
+    return custom_rom_hide_is_selinux_enforcing_enabled();
+}
+
+bool custom_rom_hide_should_propagate_adb() {
+    return custom_rom_hide_is_adb_enabled();
+}
+
+bool custom_rom_hide_should_propagate() {
+    return custom_rom_hide_is_enabled();
+}
 
 static bool is_trackable_fd(int fd) {
     return fd >= 0 && fd < HIDE_TRACKED_FD_LIMIT;
@@ -193,22 +257,41 @@ static bool compute_allowlisted() {
 }
 
 static bool compute_app_process() {
+    if (!custom_rom_hide_is_enabled()) return false;
     if ((getuid() % AID_USER_OFFSET) < AID_APP_START) return false;
+
+    // crash_dump runs with the crashing app's UID. Treating it as an app
+    // replaces /proc/<pid>/maps with a memfd and prevents debuggerd from
+    // producing a tombstone under SELinux.
+    const char* progname = getprogname();
+    if (progname && (strcmp(progname, "crash_dump32") == 0 ||
+                     strcmp(progname, "crash_dump64") == 0)) {
+        return false;
+    }
+
     if (compute_allowlisted()) return false;
     return true;
 }
 
 static bool is_app_process() {
     static _Atomic(pid_t) cached_pid = -1;
+    static _Atomic(uid_t) cached_uid = static_cast<uid_t>(-1);
     static _Atomic(bool) cached_value = false;
 
+    // An exec'd helper enables the policy lazily from its inherited marker. Do not cache a
+    // disabled result before that marker is consumed.
+    if (!custom_rom_hide_is_enabled()) return false;
+
     pid_t cur = getpid();
-    if (atomic_load_explicit(&cached_pid, memory_order_acquire) == cur) {
+    uid_t cur_uid = getuid();
+    if (atomic_load_explicit(&cached_pid, memory_order_acquire) == cur &&
+        atomic_load_explicit(&cached_uid, memory_order_acquire) == cur_uid) {
         return atomic_load_explicit(&cached_value, memory_order_acquire);
     }
 
     bool result = compute_app_process();
     atomic_store_explicit(&cached_value, result, memory_order_release);
+    atomic_store_explicit(&cached_uid, cur_uid, memory_order_release);
     atomic_store_explicit(&cached_pid, cur, memory_order_release);
     return result;
 }
@@ -257,6 +340,11 @@ static bool is_rom_path(const char* path) {
     return false;
 }
 
+static bool is_adb_socket_path(const char* path) {
+    return custom_rom_hide_is_adb_enabled() &&
+            path != nullptr && strcmp(path, "/dev/socket/adbd") == 0;
+}
+
 static bool resolve_fd_path(int fd, char* buf, size_t size) {
     char proc_link[64];
     if (fd < 0) return false;
@@ -273,7 +361,7 @@ bool custom_rom_hide_should_block(const char* path) {
     if (!path || reinterpret_cast<uintptr_t>(path) < 0x1000000) return false;
     if (path[0] != '/') return false;
     if (!is_app_process()) return false;
-    return is_rom_path(path);
+    return is_rom_path(path) || is_adb_socket_path(path);
 }
 
 bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
@@ -284,10 +372,13 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
     bool result = false;
 
     if (path[0] == '/') {
-        result = is_rom_path(path);
+        result = is_rom_path(path) || is_adb_socket_path(path);
     } else if (dirfd != AT_FDCWD) {
         size_t plen = strlen(path);
         bool candidate = plen > 0 && path[plen - 1] == '/';
+        if (custom_rom_hide_is_adb_enabled() && strcmp(path, "adbd") == 0) {
+            candidate = true;
+        }
         if (!candidate) {
             const char* base = path_basename(path);
             for (const char* const* dn = kBlockedDirnames; *dn; ++dn) {
@@ -299,7 +390,7 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
             if (resolve_fd_path(dirfd, dir_path, sizeof(dir_path))) {
                 char full_path[512];
                 snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, path);
-                result = is_rom_path(full_path);
+                result = is_rom_path(full_path) || is_adb_socket_path(full_path);
             }
         }
     }
@@ -308,9 +399,22 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
     return result;
 }
 
+int custom_rom_hide_filter_faccessat_syscall(int dirfd, const char* path) {
+    return custom_rom_hide_should_block_at(dirfd, path) ? ENOENT : 0;
+}
+
 bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
     if (!name || reinterpret_cast<uintptr_t>(name) < 0x1000000) return false;
     if (!is_app_process()) return false;
+
+    int saved_errno = errno;
+    char dir_path[256];
+    if (custom_rom_hide_is_adb_enabled() && strcmp(name, "adbd") == 0) {
+        const bool is_adb_socket = resolve_fd_path(dirfd, dir_path, sizeof(dir_path)) &&
+                strcmp(dir_path, "/dev/socket") == 0;
+        errno = saved_errno;
+        if (is_adb_socket) return true;
+    }
 
     bool name_match = false;
     for (const char* const* dn = kBlockedDirnames; *dn; ++dn) {
@@ -318,10 +422,8 @@ bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
     }
     if (!name_match) return false;
 
-    int saved_errno = errno;
     bool result = false;
 
-    char dir_path[256];
     if (resolve_fd_path(dirfd, dir_path, sizeof(dir_path))) {
         for (const PrefixEntry* pp = kDirParents; pp->str; ++pp) {
             if (strcmp(dir_path, pp->str) == 0) { result = true; break; }
@@ -338,6 +440,42 @@ static int create_encoded_memfd(const char* path) {
     int fd = raw_memfd_create(memfd_name, 0);
     if (fd >= 0) register_fd(fd);
     return fd;
+}
+
+int custom_rom_hide_filter_selinux_enforce_at(int dirfd, const char* path, int flags) {
+    if (!path || reinterpret_cast<uintptr_t>(path) < 0x1000000) return -1;
+    if ((flags & O_ACCMODE) != O_RDONLY || (flags & O_PATH) != 0) return -1;
+    if (!custom_rom_hide_is_selinux_enforcing_enabled() || !is_app_process()) return -1;
+
+    int saved_errno = errno;
+    bool match = strcmp(path, "/sys/fs/selinux/enforce") == 0;
+    char full_path[512];
+    if (!match && path[0] != '/' && dirfd != AT_FDCWD) {
+        char dir_path[384];
+        if (resolve_fd_path(dirfd, dir_path, sizeof(dir_path))) {
+            int n = snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, path);
+            match = n > 0 && static_cast<size_t>(n) < sizeof(full_path)
+                    && strcmp(full_path, "/sys/fs/selinux/enforce") == 0;
+        }
+    }
+    if (!match) {
+        errno = saved_errno;
+        return -1;
+    }
+
+    int mem_fd = create_encoded_memfd("/sys/fs/selinux/enforce");
+    if (mem_fd >= 0) {
+        static constexpr char kEnforcing[] = "1\n";
+        if (raw_write(mem_fd, kEnforcing, sizeof(kEnforcing) - 1)
+                != static_cast<ssize_t>(sizeof(kEnforcing) - 1)
+                || raw_lseek(mem_fd, 0, SEEK_SET) < 0) {
+            custom_rom_hide_unregister_fd(mem_fd);
+            raw_close(mem_fd);
+            mem_fd = -1;
+        }
+    }
+    errno = saved_errno;
+    return mem_fd;
 }
 
 static bool decode_encoded_memfd_link(const char* link, char* out, size_t out_size) {
@@ -390,12 +528,26 @@ ssize_t custom_rom_hide_readlink_post(char* buf, size_t size, ssize_t ret) {
 enum ProcFilterType {
     PROC_FILTER_NONE, PROC_FILTER_MAPS, PROC_FILTER_MOUNTS,
     PROC_FILTER_MOUNTINFO, PROC_FILTER_FILESYSTEMS, PROC_FILTER_CMDLINE,
+    PROC_FILTER_STATUS,
 };
+
+static bool is_own_proc_status(const char* path) {
+    if (strcmp(path, "/proc/self/status") == 0 ||
+        strcmp(path, "/proc/thread-self/status") == 0) {
+        return true;
+    }
+
+    if (strncmp(path, "/proc/", 6) != 0) return false;
+    char* end = nullptr;
+    long pid = strtol(path + 6, &end, 10);
+    return end != path + 6 && strcmp(end, "/status") == 0 && pid == getpid();
+}
 
 static ProcFilterType get_proc_filter_type(const char* path) {
     if (!path || reinterpret_cast<uintptr_t>(path) < 0x1000000) return PROC_FILTER_NONE;
     if (strcmp(path, "/proc/cmdline") == 0) return PROC_FILTER_CMDLINE;
     if (strcmp(path, "/proc/filesystems") == 0) return PROC_FILTER_FILESYSTEMS;
+    if (is_own_proc_status(path)) return PROC_FILTER_STATUS;
     if (strncmp(path, "/proc/", 6) != 0) return PROC_FILTER_NONE;
 
     const char* leaf = nullptr;
@@ -479,6 +631,16 @@ typedef bool (*LinePredicate)(const char* line, void* ctx);
 typedef void (*LineWriter)(int mem_fd, char* line, size_t line_len, void* ctx);
 
 static void write_line_raw(int mem_fd, char* line, size_t line_len, void*) {
+    raw_write(mem_fd, line, line_len);
+}
+
+static void write_status_line(int mem_fd, char* line, size_t line_len, void*) {
+    static constexpr char kTracerPid[] = "TracerPid:";
+    if (strncmp(line, kTracerPid, sizeof(kTracerPid) - 1) == 0) {
+        static constexpr char kHiddenTracer[] = "TracerPid:\t0\n";
+        raw_write(mem_fd, kHiddenTracer, sizeof(kHiddenTracer) - 1);
+        return;
+    }
     raw_write(mem_fd, line, line_len);
 }
 
@@ -598,8 +760,14 @@ int custom_rom_hide_filter_proc(const char* path) {
     if (type == PROC_FILTER_NONE) { errno = saved_errno; return -1; }
 
     if (type != PROC_FILTER_CMDLINE) {
-        LineWriter writer = (type == PROC_FILTER_MOUNTS || type == PROC_FILTER_MOUNTINFO)
-                ? write_spoofed_mount_line : write_line_raw;
+        LineWriter writer;
+        if (type == PROC_FILTER_MOUNTS || type == PROC_FILTER_MOUNTINFO) {
+            writer = write_spoofed_mount_line;
+        } else if (type == PROC_FILTER_STATUS) {
+            writer = write_status_line;
+        } else {
+            writer = write_line_raw;
+        }
         int mem_fd = filter_file_with(path, drop_proc_line, writer, &type);
         errno = saved_errno;
         return mem_fd;
@@ -719,8 +887,11 @@ int custom_rom_hide_filter_vintf(const char* path) {
 
 static const char* const kSpoofedEmptyProps[] = {
     "ro.crdroid.version", "ro.lineage.version", "ro.lineage.build.version", "ro.cm.build.version",
-    "ro.modversion", "init.svc_debug_pid.adb_root",
-    "init.svc.adb_root", "service.adb.root", nullptr
+    "ro.modversion", nullptr
+};
+
+static const char* const kSpoofedAdbEmptyProps[] = {
+    "init.svc_debug_pid.adb_root", "init.svc.adb_root", "service.adb.root", nullptr
 };
 
 struct PropOverride { const char* name; const char* value; };
@@ -729,7 +900,16 @@ static const PropOverride kSpoofedValueProps[] = {
     {"ro.build.type", "user"},
     {"ro.build.tags", "release-keys"},
     {"ro.secure", "1"},
+    {nullptr, nullptr}
+};
+
+static const PropOverride kSpoofedAdbValueProps[] = {
     {"ro.adb.secure", "1"},
+    {"init.svc.adbd", "stopped"},
+    {"sys.usb.config", "mtp"},
+    {"sys.usb.state", "mtp"},
+    {"sys.usb.adb.disabled", "1"},
+    {"persist.sys.usb.config", "mtp"},
     {nullptr, nullptr}
 };
 
@@ -744,6 +924,13 @@ bool custom_rom_hide_should_spoof_prop(const char* name, char* value) {
     for (const PropOverride* o = kSpoofedValueProps; o->name; ++o) {
         if (strcmp(name, o->name) == 0) { strcpy(value, o->value); return true; }
     }
+    if (!custom_rom_hide_is_adb_enabled()) return false;
+    for (const char* const* p = kSpoofedAdbEmptyProps; *p; ++p) {
+        if (strcmp(name, *p) == 0) { value[0] = '\0'; return true; }
+    }
+    for (const PropOverride* o = kSpoofedAdbValueProps; o->name; ++o) {
+        if (strcmp(name, o->name) == 0) { strcpy(value, o->value); return true; }
+    }
     return false;
 }
 
@@ -753,6 +940,10 @@ bool custom_rom_hide_should_hide_prop(const char* name) {
     for (const char* const* p = kSpoofedEmptyProps; *p; ++p) {
         if (strcmp(name, *p) == 0) return true;
     }
+    if (!custom_rom_hide_is_adb_enabled()) return false;
+    for (const char* const* p = kSpoofedAdbEmptyProps; *p; ++p) {
+        if (strcmp(name, *p) == 0) return true;
+    }
     return false;
 }
 
@@ -760,6 +951,10 @@ const char* custom_rom_hide_get_prop_override(const char* name) {
     if (!name || reinterpret_cast<uintptr_t>(name) < 0x1000000) return nullptr;
     if (!is_app_process()) return nullptr;
     for (const PropOverride* o = kSpoofedValueProps; o->name; ++o) {
+        if (strcmp(name, o->name) == 0) return o->value;
+    }
+    if (!custom_rom_hide_is_adb_enabled()) return nullptr;
+    for (const PropOverride* o = kSpoofedAdbValueProps; o->name; ++o) {
         if (strcmp(name, o->name) == 0) return o->value;
     }
     return nullptr;
