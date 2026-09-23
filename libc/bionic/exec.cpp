@@ -39,6 +39,8 @@
 #include <string.h>
 #include <unistd.h>
 
+#include <async_safe/log.h>
+
 #include "custom_rom_hide.h"
 #include "private/FdPath.h"
 #include "private/__bionic_get_shell_path.h"
@@ -53,6 +55,14 @@ int execve(const char* name, char* const* argv, char* const* envp) {
   if (!propagate_privacy && !propagate_adb && !propagate_selinux) {
     return __execve(name, argv, envp);
   }
+
+  async_safe_format_log(ANDROID_LOG_INFO, "AxSandboxAudit",
+                        "exec name=%s argv0=%s argv1=%s argv2=%s privacy=%d adb=%d selinux=%d",
+                        name != nullptr ? name : "<null>",
+                        argv != nullptr && argv[0] != nullptr ? argv[0] : "<null>",
+                        argv != nullptr && argv[1] != nullptr ? argv[1] : "<null>",
+                        argv != nullptr && argv[2] != nullptr ? argv[2] : "<null>",
+                        propagate_privacy, propagate_adb, propagate_selinux);
 
   static char privacy_marker[] = "BIONIC_AX_SANDBOX_PRIVACY=1";
   static constexpr char privacy_prefix[] = "BIONIC_AX_SANDBOX_PRIVACY=";
