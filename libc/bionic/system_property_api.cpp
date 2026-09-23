@@ -43,11 +43,7 @@ static_assert(__is_trivially_constructible(SystemProperties),
               "System Properties must be trivially constructable");
 
 static bool should_audit_sandbox_property(const char* name) {
-  if (name == nullptr || !custom_rom_hide_is_app_process()) return false;
-  return strcmp(name, "ro.debuggable") == 0 || strcmp(name, "ro.secure") == 0 ||
-         strcmp(name, "ro.build.selinux") == 0 || strcmp(name, "service.adb.root") == 0 ||
-         strcmp(name, "init.svc.adbd") == 0 || strcmp(name, "sys.usb.config") == 0 ||
-         strcmp(name, "sys.usb.state") == 0 || strcmp(name, "persist.sys.usb.config") == 0;
+  return name != nullptr && custom_rom_hide_is_app_process() && custom_rom_hide_is_enabled();
 }
 
 // This is public because it was exposed in the NDK. As of 2017-01, ~60 apps reference this symbol.
@@ -173,8 +169,8 @@ int __system_property_get(const char* name, char* value) {
   int len = system_properties.Get(name, value);
   if (should_audit_sandbox_property(name)) {
     async_safe_format_log(ANDROID_LOG_INFO, "AxSandboxAudit",
-                          "property_get name=%s result=real value=%s len=%d", name,
-                          len > 0 ? value : "<missing>", len);
+                          "property_get name=%s result=real state=%s len=%d", name,
+                          len > 0 ? "present" : "missing", len);
   }
   return len;
 }
