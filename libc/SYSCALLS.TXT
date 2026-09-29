@@ -72,7 +72,7 @@ kill(pid_t, int) all
 tgkill(pid_t tgid, pid_t tid, int sig) all
 
 __brk:brk(void*) all
-execve(const char*, char* const*, char* const*)  all
+__execve:execve(const char*, char* const*, char* const*)  all
 __ptrace:ptrace(int request, int pid, void* addr, void* data) all
 
 # <sys/resource.h>
