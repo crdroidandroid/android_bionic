@@ -29,9 +29,11 @@
 #include <sys/system_properties.h>
 
 #include <async_safe/CHECK.h>
+#include <async_safe/log.h>
 #include <system_properties/prop_area.h>
 #include <system_properties/system_properties.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "private/bionic_defs.h"
@@ -40,6 +42,22 @@
 static SystemProperties system_properties;
 static_assert(__is_trivially_constructible(SystemProperties),
               "System Properties must be trivially constructable");
+
+static bool should_audit_sandbox_property(const char* name) {
+  if (name == nullptr || !custom_rom_hide_is_app_process()) return false;
+  return strcmp(name, "ro.debuggable") == 0 || strcmp(name, "ro.secure") == 0 ||
+         strcmp(name, "ro.build.selinux") == 0 || strcmp(name, "service.adb.root") == 0 ||
+         strcmp(name, "init.svc.adbd") == 0 || strcmp(name, "sys.usb.config") == 0 ||
+         strcmp(name, "sys.usb.state") == 0 || strcmp(name, "persist.sys.usb.config") == 0;
+}
+
+// Temporary, target-scoped diagnostic. This records only the return PC, never property values.
+static bool should_trace_cxtem_caller(const char* name) {
+  if (name == nullptr || !custom_rom_hide_is_app_process()) return false;
+  if (strcmp(name, "init.svc.adbd") != 0 && strcmp(name, "service.adb.root") != 0) return false;
+  const char* progname = getprogname();
+  return progname != nullptr && strcmp(progname, "br.gov.caixa.tem") == 0;
+}
 
 // This is public because it was exposed in the NDK. As of 2017-01, ~60 apps reference this symbol.
 // It is set to nullptr and never modified.
@@ -70,9 +88,19 @@ uint32_t __system_property_area_serial() {
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
 const prop_info* __system_property_find(const char* name) {
   if (custom_rom_hide_should_hide_prop(name)) {
+    if (should_audit_sandbox_property(name)) {
+      async_safe_format_log(ANDROID_LOG_INFO, "AxSandboxAudit",
+                            "property_find name=%s result=hidden", name);
+    }
     return nullptr;
   }
-  return system_properties.Find(name);
+  const prop_info* result = system_properties.Find(name);
+  if (should_audit_sandbox_property(name)) {
+    async_safe_format_log(ANDROID_LOG_INFO, "AxSandboxAudit",
+                          "property_find name=%s result=%s", name,
+                          result == nullptr ? "missing" : "present");
+  }
+  return result;
 }
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
@@ -139,9 +167,28 @@ void __system_property_read_callback(const prop_info* pi,
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
 int __system_property_get(const char* name, char* value) {
-  int len = system_properties.Get(name, value);
+  if (should_trace_cxtem_caller(name)) {
+    async_safe_format_log(ANDROID_LOG_INFO, "AxSandboxCaller",
+                          "property_get name=%s caller=%p", name,
+                          __builtin_return_address(0));
+  }
+  // Resolve sandbox overrides before touching the real property area. Besides avoiding an
+  // unnecessary SELinux denial, this makes a virtual property indistinguishable from an
+  // ordinary successful __system_property_get() call to its caller.
   if (custom_rom_hide_should_spoof_prop(name, value)) {
-    return strlen(value);
+    const int len = strlen(value);
+    if (should_audit_sandbox_property(name)) {
+      async_safe_format_log(ANDROID_LOG_INFO, "AxSandboxAudit",
+                            "property_get name=%s result=override value=%s len=%d", name,
+                            value, len);
+    }
+    return len;
+  }
+  int len = system_properties.Get(name, value);
+  if (should_audit_sandbox_property(name)) {
+    async_safe_format_log(ANDROID_LOG_INFO, "AxSandboxAudit",
+                          "property_get name=%s result=real state=%s len=%d", name,
+                          len > 0 ? "present" : "missing", len);
   }
   return len;
 }
@@ -212,7 +259,20 @@ bool __system_property_wait(const prop_info* pi, uint32_t old_serial, uint32_t* 
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
 const prop_info* __system_property_find_nth(unsigned n) {
-  return system_properties.FindNth(n);
+  if (!custom_rom_hide_is_app_process()) {
+    return system_properties.FindNth(n);
+  }
+
+  // Keep indexed enumeration consistent with __system_property_foreach():
+  // properties hidden from sandboxed apps must not remain discoverable merely
+  // because a caller chose the deprecated find_nth API.
+  for (unsigned real_index = 0, visible_index = 0;; ++real_index) {
+    const prop_info* pi = system_properties.FindNth(real_index);
+    if (pi == nullptr) return nullptr;
+
+    if (custom_rom_hide_should_hide_prop(pi->name)) continue;
+    if (visible_index++ == n) return pi;
+  }
 }
 
 struct ForeachOverrideCtx {
