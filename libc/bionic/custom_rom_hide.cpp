@@ -70,6 +70,10 @@ static const char* const kMountFilterKeywords[] = {
     "/debug_ramdisk", "overlay", "magisk", "ksu", "KSU", "ksud", "apatch", "/data/adb", nullptr
 };
 
+static const char* const kUnixFilterKeywords[] = {
+    "@jdwp-control", nullptr
+};
+
 static const char* const kAllowlistedPackages[] = {
     "org.lineageos.updater",
     nullptr
@@ -117,6 +121,12 @@ bool custom_rom_hide_is_enabled() {
 
 void custom_rom_hide_set_adb_enabled(bool enabled) {
     atomic_store_explicit(&g_adb_enabled, enabled, memory_order_release);
+    if (enabled) {
+        // ADB isolation is an independent Sandbox option. Keep the common
+        // app-process property/path virtualization active even when the
+        // broader privacy option is disabled.
+        atomic_store_explicit(&g_custom_rom_hide_enabled, true, memory_order_release);
+    }
 }
 
 bool custom_rom_hide_is_adb_enabled() {
@@ -528,7 +538,7 @@ ssize_t custom_rom_hide_readlink_post(char* buf, size_t size, ssize_t ret) {
 enum ProcFilterType {
     PROC_FILTER_NONE, PROC_FILTER_MAPS, PROC_FILTER_MOUNTS,
     PROC_FILTER_MOUNTINFO, PROC_FILTER_FILESYSTEMS, PROC_FILTER_CMDLINE,
-    PROC_FILTER_STATUS,
+    PROC_FILTER_STATUS, PROC_FILTER_UNIX,
 };
 
 static bool is_own_proc_status(const char* path) {
@@ -561,6 +571,7 @@ static ProcFilterType get_proc_filter_type(const char* path) {
     }
 
     if (!leaf) return PROC_FILTER_NONE;
+    if (strcmp(leaf, "net/unix") == 0) return PROC_FILTER_UNIX;
     if (strcmp(leaf, "maps") == 0 || strcmp(leaf, "smaps") == 0) return PROC_FILTER_MAPS;
     if (strcmp(leaf, "mounts") == 0) return PROC_FILTER_MOUNTS;
     if (strcmp(leaf, "mountinfo") == 0) return PROC_FILTER_MOUNTINFO;
@@ -598,6 +609,9 @@ static bool should_filter_line(ProcFilterType type, const char* line) {
         case PROC_FILTER_MOUNTS:
         case PROC_FILTER_MOUNTINFO: return line_contains_any(line, kMountFilterKeywords);
         case PROC_FILTER_FILESYSTEMS: return strstr(line, "overlay") != nullptr;
+        case PROC_FILTER_UNIX:
+            return custom_rom_hide_is_adb_enabled() &&
+                    line_contains_any(line, kUnixFilterKeywords);
         default: return false;
     }
 }
@@ -913,6 +927,13 @@ static const PropOverride kSpoofedAdbValueProps[] = {
     {nullptr, nullptr}
 };
 
+static constexpr char kDebugLdPropertyPrefix[] = "debug.ld.";
+
+static bool is_debug_ld_property(const char* name) {
+    return name != nullptr &&
+            strncmp(name, kDebugLdPropertyPrefix, sizeof(kDebugLdPropertyPrefix) - 1) == 0;
+}
+
 bool custom_rom_hide_should_spoof_prop(const char* name, char* value) {
     if (!name || !value) return false;
     if (reinterpret_cast<uintptr_t>(name) < 0x1000000) return false;
@@ -925,6 +946,10 @@ bool custom_rom_hide_should_spoof_prop(const char* name, char* value) {
         if (strcmp(name, o->name) == 0) { strcpy(value, o->value); return true; }
     }
     if (!custom_rom_hide_is_adb_enabled()) return false;
+    if (is_debug_ld_property(name)) {
+        value[0] = '\0';
+        return true;
+    }
     for (const char* const* p = kSpoofedAdbEmptyProps; *p; ++p) {
         if (strcmp(name, *p) == 0) { value[0] = '\0'; return true; }
     }
@@ -954,6 +979,7 @@ const char* custom_rom_hide_get_prop_override(const char* name) {
         if (strcmp(name, o->name) == 0) return o->value;
     }
     if (!custom_rom_hide_is_adb_enabled()) return nullptr;
+    if (is_debug_ld_property(name)) return "";
     for (const PropOverride* o = kSpoofedAdbValueProps; o->name; ++o) {
         if (strcmp(name, o->name) == 0) return o->value;
     }

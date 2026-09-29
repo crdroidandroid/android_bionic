@@ -33,6 +33,7 @@
 #include <system_properties/prop_area.h>
 #include <system_properties/system_properties.h>
 
+#include <stdlib.h>
 #include <string.h>
 
 #include "private/bionic_defs.h"
@@ -43,7 +44,19 @@ static_assert(__is_trivially_constructible(SystemProperties),
               "System Properties must be trivially constructable");
 
 static bool should_audit_sandbox_property(const char* name) {
-  return name != nullptr && custom_rom_hide_is_app_process() && custom_rom_hide_is_enabled();
+  if (name == nullptr || !custom_rom_hide_is_app_process()) return false;
+  return strcmp(name, "ro.debuggable") == 0 || strcmp(name, "ro.secure") == 0 ||
+         strcmp(name, "ro.build.selinux") == 0 || strcmp(name, "service.adb.root") == 0 ||
+         strcmp(name, "init.svc.adbd") == 0 || strcmp(name, "sys.usb.config") == 0 ||
+         strcmp(name, "sys.usb.state") == 0 || strcmp(name, "persist.sys.usb.config") == 0;
+}
+
+// Temporary, target-scoped diagnostic. This records only the return PC, never property values.
+static bool should_trace_cxtem_caller(const char* name) {
+  if (name == nullptr || !custom_rom_hide_is_app_process()) return false;
+  if (strcmp(name, "init.svc.adbd") != 0 && strcmp(name, "service.adb.root") != 0) return false;
+  const char* progname = getprogname();
+  return progname != nullptr && strcmp(progname, "br.gov.caixa.tem") == 0;
 }
 
 // This is public because it was exposed in the NDK. As of 2017-01, ~60 apps reference this symbol.
@@ -154,6 +167,11 @@ void __system_property_read_callback(const prop_info* pi,
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
 int __system_property_get(const char* name, char* value) {
+  if (should_trace_cxtem_caller(name)) {
+    async_safe_format_log(ANDROID_LOG_INFO, "AxSandboxCaller",
+                          "property_get name=%s caller=%p", name,
+                          __builtin_return_address(0));
+  }
   // Resolve sandbox overrides before touching the real property area. Besides avoiding an
   // unnecessary SELinux denial, this makes a virtual property indistinguishable from an
   // ordinary successful __system_property_get() call to its caller.
