@@ -234,3 +234,5 @@ ENTRY(__memset_aarch64_nt_simd)
 	ret
 
 END(__memset_aarch64_nt_simd)
+
+NOTE_GNU_PROPERTY()
