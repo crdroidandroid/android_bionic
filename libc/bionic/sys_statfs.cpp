@@ -14,6 +14,7 @@
  * limitations under the License.
  */
 
+#include <errno.h>
 #include <sys/statfs.h>
 
 #include "custom_rom_hide.h"
@@ -48,10 +49,15 @@ int fstatfs(int fd, struct statfs* result) {
 __strong_alias(fstatfs64, fstatfs);
 
 int statfs(const char* path, struct statfs* result) {
+  if (custom_rom_hide_should_block(path)) {
+    errno = ENOENT;
+    return -1;
+  }
   int rc = __statfs64(path, sizeof(*result), result);
   if (rc != 0) {
     return rc;
   }
+  custom_rom_hide_spoof_statfs(path, result);
   result->f_flags &= ~ST_VALID;
   return 0;
 }

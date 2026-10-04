@@ -34,6 +34,7 @@ bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name);
 
 void custom_rom_hide_spoof_stat(const char* path, struct stat* sb);
 void custom_rom_hide_spoof_statx(const char* path, struct statx* sx);
+void custom_rom_hide_spoof_statfs(const char* path, struct statfs* sf);
 void custom_rom_hide_spoof_fd_stat(int fd, struct stat* sb);
 void custom_rom_hide_spoof_fd_statx(int fd, unsigned mask, struct statx* sx);
 void custom_rom_hide_spoof_fd_statfs(int fd, struct statfs* sf);

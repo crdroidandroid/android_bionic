@@ -1,6 +1,7 @@
 /*
  * Copyright (C) 2025-2026 AxionOS
  * Copyright (C) 2026 VoltageOS
+ * Copyright (C) 2026 crDroid Android Project
  *
  * Licensed under the Apache License, Version 2.0 (the "License");
  * you may not use this file except in compliance with the License.
@@ -41,6 +42,16 @@
 #define HIDE_TRACKED_FD_WORD_BITS 64
 #define HIDE_TRACKED_FD_WORD_COUNT (HIDE_TRACKED_FD_LIMIT / HIDE_TRACKED_FD_WORD_BITS)
 
+#ifndef OVERLAYFS_SUPER_MAGIC
+#define OVERLAYFS_SUPER_MAGIC 0x794c7630
+#endif
+#ifndef EROFS_SUPER_MAGIC_V1
+#define EROFS_SUPER_MAGIC_V1 0xe0f5e1e2
+#endif
+#ifndef TMPFS_MAGIC
+#define TMPFS_MAGIC 0x01021994
+#endif
+
 struct PrefixEntry {
     const char* str;
     size_t len;
@@ -56,13 +67,52 @@ static const PrefixEntry kDirParents[] = {
     PE("/system_ext"), PE("/system_ext/etc"),
     PE("/product"), PE("/product/etc"),
     PE("/vendor"), PE("/vendor/etc"),
+    PE("/odm"), PE("/odm/etc"),
+    PE("/etc"),
     PE("/sdcard"), PE("/data/media/0"),
+    { nullptr, 0 }
+};
+
+static const PrefixEntry kFrameworkDirs[] = {
+    PE("/system/framework"),
+    PE("/system_ext/framework"),
+    PE("/product/framework"),
+    { nullptr, 0 }
+};
+
+static const PrefixEntry kRomArtifactPrefixes[] = {
+    PE("org.lineageos."),
+    PE("org.libremobileos."),
+    PE("com.crdroid."),
+    PE("lineage-sdk"),
+    PE("lineagesettings"),
+    PE("co.aospa."),
+    PE("com.android.axion."),
+    PE("org.lunaris."),
+    PE("org.omnirom."),
+    PE("org.protonaosp."),
     { nullptr, 0 }
 };
 
 static const PrefixEntry kProcFilterKeywords[] = {
     PE("lineage"), PE("Lineage"), PE("crdroid"), PE("crDroid"),
     PE("omnirom"), PE("aospa"),
+    { nullptr, 0 }
+};
+
+static const PrefixEntry kConfigDirs[] = {
+    PE("/system/etc/selinux"),      PE("/system_ext/etc/selinux"),
+    PE("/product/etc/selinux"),     PE("/vendor/etc/selinux"),
+    PE("/odm/etc/selinux"),
+    PE("/system/etc/init"),         PE("/system_ext/etc/init"),
+    PE("/product/etc/init"),        PE("/vendor/etc/init"),
+    PE("/odm/etc/init"),
+    PE("/system/etc/permissions"),  PE("/system_ext/etc/permissions"),
+    PE("/product/etc/permissions"), PE("/vendor/etc/permissions"),
+    PE("/system/etc/sysconfig"),    PE("/system_ext/etc/sysconfig"),
+    PE("/product/etc/sysconfig"),
+    PE("/system/etc/vintf"),        PE("/system_ext/etc/vintf"),
+    PE("/product/etc/vintf"),       PE("/vendor/etc/vintf"),
     { nullptr, 0 }
 };
 
@@ -192,25 +242,21 @@ static bool compute_allowlisted() {
     return false;
 }
 
-static bool compute_app_process() {
-    if ((getuid() % AID_USER_OFFSET) < AID_APP_START) return false;
-    if (compute_allowlisted()) return false;
-    return true;
+static bool is_allowlisted_process() {
+    static pid_t cached_pid = -1;
+    static bool cached_value = false;
+    pid_t cur = getpid();
+    if (cur == cached_pid) return cached_value;
+    bool result = compute_allowlisted();
+    cached_value = result;
+    cached_pid = cur;
+    return result;
 }
 
 static bool is_app_process() {
-    static _Atomic(pid_t) cached_pid = -1;
-    static _Atomic(bool) cached_value = false;
-
-    pid_t cur = getpid();
-    if (atomic_load_explicit(&cached_pid, memory_order_acquire) == cur) {
-        return atomic_load_explicit(&cached_value, memory_order_acquire);
-    }
-
-    bool result = compute_app_process();
-    atomic_store_explicit(&cached_value, result, memory_order_release);
-    atomic_store_explicit(&cached_pid, cur, memory_order_release);
-    return result;
+    if ((getuid() % AID_USER_OFFSET) < AID_APP_START) return false;
+    if (is_allowlisted_process()) return false;
+    return true;
 }
 
 static const char* path_basename(const char* path) {
@@ -221,6 +267,40 @@ static const char* path_basename(const char* path) {
 static bool path_parent_equals(const char* path, const char* parent, size_t plen) {
     if (strncmp(path, parent, plen) != 0) return false;
     return path[plen] == '/';
+}
+
+static bool basename_is_rom_artifact(const char* name) {
+    for (const PrefixEntry* p = kRomArtifactPrefixes; p->str; ++p) {
+        if (strncmp(name, p->str, p->len) == 0) return true;
+    }
+    return false;
+}
+
+static bool name_has_rom_keyword(const char* name) {
+    for (const PrefixEntry* kw = kProcFilterKeywords; kw->str; ++kw) {
+        if (strstr(name, kw->str) != nullptr) return true;
+    }
+    return false;
+}
+
+static bool dir_is_config(const char* dir_path) {
+    for (const PrefixEntry* d = kConfigDirs; d->str; ++d) {
+        if (strcmp(dir_path, d->str) == 0) return true;
+    }
+    return false;
+}
+
+static bool is_rom_framework_artifact(const char* path) {
+    const char* rest = nullptr;
+    for (const PrefixEntry* d = kFrameworkDirs; d->str; ++d) {
+        if (strncmp(path, d->str, d->len) == 0 && path[d->len] == '/') {
+            rest = path + d->len + 1;
+            break;
+        }
+    }
+    if (!rest) return false;
+    const char* slash = strrchr(rest, '/');
+    return basename_is_rom_artifact(slash ? slash + 1 : rest);
 }
 
 static bool is_blocked_dir(const char* path) {
@@ -254,6 +334,7 @@ static bool is_rom_path(const char* path) {
     }
 
     if (is_blocked_dir(clean)) return true;
+    if (is_rom_framework_artifact(clean)) return true;
     return false;
 }
 
@@ -293,6 +374,7 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
             for (const char* const* dn = kBlockedDirnames; *dn; ++dn) {
                 if (strcmp(base, *dn) == 0) { candidate = true; break; }
             }
+            if (!candidate && basename_is_rom_artifact(base)) candidate = true;
         }
         if (candidate) {
             char dir_path[256];
@@ -312,19 +394,32 @@ bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
     if (!name || reinterpret_cast<uintptr_t>(name) < 0x1000000) return false;
     if (!is_app_process()) return false;
 
-    bool name_match = false;
-    for (const char* const* dn = kBlockedDirnames; *dn; ++dn) {
-        if (strcmp(name, *dn) == 0) { name_match = true; break; }
+    if (name[0] == '.' && (name[1] == '\0'
+            || (name[1] == '.' && name[2] == '\0'))) {
+        return false;
     }
-    if (!name_match) return false;
+
+    bool maybe = false;
+    for (const char* const* dn = kBlockedDirnames; *dn; ++dn) {
+        if (strcmp(name, *dn) == 0) { maybe = true; break; }
+    }
+    if (!maybe && basename_is_rom_artifact(name)) maybe = true;
+    if (!maybe && name_has_rom_keyword(name)) maybe = true;
+    if (!maybe) return false;
 
     int saved_errno = errno;
     bool result = false;
 
-    char dir_path[256];
+    char dir_path[384];
     if (resolve_fd_path(dirfd, dir_path, sizeof(dir_path))) {
-        for (const PrefixEntry* pp = kDirParents; pp->str; ++pp) {
-            if (strcmp(dir_path, pp->str) == 0) { result = true; break; }
+        char full_path[640];
+        int n = snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, name);
+        if (n > 0 && static_cast<size_t>(n) < sizeof(full_path)) {
+            if (is_rom_path(full_path)) {
+                result = true;
+            } else if (dir_is_config(dir_path) && name_has_rom_keyword(name)) {
+                result = true;
+            }
         }
     }
 
@@ -409,9 +504,13 @@ static ProcFilterType get_proc_filter_type(const char* path) {
     }
 
     if (!leaf) return PROC_FILTER_NONE;
-    if (strcmp(leaf, "maps") == 0 || strcmp(leaf, "smaps") == 0) return PROC_FILTER_MAPS;
-    if (strcmp(leaf, "mounts") == 0) return PROC_FILTER_MOUNTS;
-    if (strcmp(leaf, "mountinfo") == 0) return PROC_FILTER_MOUNTINFO;
+
+    const char* leaf_base = strrchr(leaf, '/');
+    leaf_base = leaf_base ? leaf_base + 1 : leaf;
+
+    if (strcmp(leaf_base, "maps") == 0 || strcmp(leaf_base, "smaps") == 0) return PROC_FILTER_MAPS;
+    if (strcmp(leaf_base, "mounts") == 0) return PROC_FILTER_MOUNTS;
+    if (strcmp(leaf_base, "mountinfo") == 0) return PROC_FILTER_MOUNTINFO;
 
     return PROC_FILTER_NONE;
 }
@@ -419,6 +518,9 @@ static ProcFilterType get_proc_filter_type(const char* path) {
 static bool line_has_blocked_segment(const char* line) {
     const char* path = strchr(line, '/');
     if (!path) return false;
+
+    if (is_rom_framework_artifact(path)) return true;
+
     for (const PrefixEntry* kw = kProcFilterKeywords; kw->str; ++kw) {
         const char* p = path;
         while ((p = strstr(p, kw->str)) != nullptr) {
@@ -620,33 +722,32 @@ int custom_rom_hide_filter_proc(const char* path) {
     return mem_fd;
 }
 
-static const char* const kSepolicyFilterPaths[] = {
-    "/system/etc/selinux/plat_service_contexts", "/system/etc/selinux/plat_seapp_contexts",
-    "/system/etc/selinux/plat_file_contexts", "/system/etc/selinux/plat_property_contexts",
-    "/system/etc/selinux/plat_sepolicy.cil", "/system_ext/etc/selinux/system_ext_service_contexts",
-    "/system_ext/etc/selinux/system_ext_seapp_contexts", "/system_ext/etc/selinux/system_ext_file_contexts",
-    "/system_ext/etc/selinux/system_ext_property_contexts", "/system_ext/etc/selinux/system_ext_sepolicy.cil",
-    "/product/etc/selinux/product_service_contexts", "/product/etc/selinux/product_seapp_contexts",
-    "/product/etc/selinux/product_file_contexts", "/product/etc/selinux/product_property_contexts",
-    "/vendor/etc/selinux/vendor_file_contexts", "/vendor/etc/selinux/vendor_service_contexts",
-    "/vendor/etc/selinux/vendor_hwservice_contexts", "/vendor/etc/selinux/vendor_property_contexts",
-    "/vendor/etc/selinux/vendor_sepolicy.cil", "/vendor/etc/selinux/plat_pub_versioned.cil", nullptr
-};
+static bool is_selinux_policy_path(const char* path) {
+    if (!strstr(path, "/selinux/")) return false;
+    const char* base = path_basename(path);
+    return strstr(base, "_contexts") != nullptr
+        || strstr(base, "sepolicy.cil") != nullptr;
+}
+
+static bool line_has_rom_keyword(const char* line) {
+    for (const PrefixEntry* kw = kProcFilterKeywords; kw->str; ++kw) {
+        if (strstr(line, kw->str) != nullptr) return true;
+    }
+    return false;
+}
+
+static bool drop_sepolicy_line(const char* line, void*) {
+    return line_has_rom_keyword(line);
+}
 
 int custom_rom_hide_filter_sepolicy(const char* path) {
     if (!is_app_process()) return -1;
     if (!path || reinterpret_cast<uintptr_t>(path) < 0x1000000) return -1;
 
     int saved_errno = errno;
-    bool match = false;
-    for (const char* const* p = kSepolicyFilterPaths; *p; ++p) {
-        if (strcmp(path, *p) == 0) { match = true; break; }
-    }
-    if (!match) { errno = saved_errno; return -1; }
+    if (!is_selinux_policy_path(path)) { errno = saved_errno; return -1; }
 
-    int mem_fd = filter_file_with(path, [](const char* line, void*) {
-        return strstr(line, "lineage") != nullptr;
-    }, write_line_raw, nullptr);
+    int mem_fd = filter_file_with(path, drop_sepolicy_line, write_line_raw, nullptr);
     errno = saved_errno;
     return mem_fd;
 }
@@ -777,6 +878,12 @@ static const PartitionDevEntry* find_partition_entry(const char* path) {
     return nullptr;
 }
 
+static void normalize_statfs_type(struct statfs* sf) {
+    if (sf->f_type == static_cast<decltype(sf->f_type)>(OVERLAYFS_SUPER_MAGIC)) {
+        sf->f_type = static_cast<decltype(sf->f_type)>(EROFS_SUPER_MAGIC_V1);
+    }
+}
+
 void custom_rom_hide_spoof_stat(const char* path, struct stat* sb) {
     if (!is_app_process() || !path || !sb) return;
     if (strcmp(path, "/data/local/tmp") == 0) { sb->st_ino = 4223; return; }
@@ -791,6 +898,11 @@ void custom_rom_hide_spoof_statx(const char* path, struct statx* sx) {
         sx->stx_dev_major = DM_MAJOR;
         sx->stx_dev_minor = e->dm_minor;
     }
+}
+
+void custom_rom_hide_spoof_statfs(const char* path, struct statfs* sf) {
+    if (!is_app_process() || !path || !sf) return;
+    normalize_statfs_type(sf);
 }
 
 void custom_rom_hide_spoof_fd_stat(int fd, struct stat* sb) {
@@ -834,18 +946,20 @@ void custom_rom_hide_spoof_fd_statx(int fd, unsigned mask, struct statx* sx) {
 
 void custom_rom_hide_spoof_fd_statfs(int fd, struct statfs* sf) {
     if (fd < 0 || !sf) return;
-    if (!is_tracked_fd(fd)) return;
     if (!is_app_process()) return;
 
     int saved_errno = errno;
-    char real_path[512];
-    if (resolve_encoded_memfd_path(fd, real_path, sizeof(real_path))) {
-        struct statfs real_sf;
-        if (raw_statfs(real_path, &real_sf) == 0) {
-            *sf = real_sf;
-        } else {
-            sf->f_type = PROC_SUPER_MAGIC;
+    if (is_tracked_fd(fd)) {
+        char real_path[512];
+        if (resolve_encoded_memfd_path(fd, real_path, sizeof(real_path))) {
+            struct statfs real_sf;
+            if (raw_statfs(real_path, &real_sf) == 0) {
+                *sf = real_sf;
+            } else {
+                sf->f_type = PROC_SUPER_MAGIC;
+            }
         }
     }
+    normalize_statfs_type(sf);
     errno = saved_errno;
 }
