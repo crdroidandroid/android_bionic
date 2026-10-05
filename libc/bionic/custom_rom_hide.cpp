@@ -224,38 +224,63 @@ static inline int raw_statfs(const char* path, struct statfs* sf) {
 #endif
 }
 
-static bool compute_allowlisted() {
+static bool read_cmdline_name(char* out, size_t out_size) {
+    if (out_size == 0) return false;
     int fd = raw_openat("/proc/self/cmdline", O_RDONLY);
     if (fd < 0) return false;
 
-    char cmdline[256];
-    ssize_t n = raw_read(fd, cmdline, sizeof(cmdline) - 1);
+    ssize_t n = raw_read(fd, out, out_size - 1);
     raw_close(fd);
     if (n <= 0) return false;
 
-    cmdline[n] = '\0';
-    if (char* colon = strchr(cmdline, ':')) *colon = '\0';
+    out[n] = '\0';
+    if (char* colon = strchr(out, ':')) *colon = '\0';
+    return true;
+}
+
+static bool name_is_zygote(const char* name) {
+    size_t len = strlen(name);
+    static const char kZygoteSuffix[] = "_zygote";
+    size_t slen = sizeof(kZygoteSuffix) - 1;
+    if (len >= slen && strcmp(name + len - slen, kZygoteSuffix) == 0) return true;
+    if (strcmp(name, "zygote") == 0 || strcmp(name, "zygote64") == 0) return true;
+    if (strcmp(name, "usap32") == 0 || strcmp(name, "usap64") == 0) return true;
+    return false;
+}
+
+static bool compute_exempt(bool* is_zygote) {
+    *is_zygote = false;
+
+    char name[256];
+    if (!read_cmdline_name(name, sizeof(name))) return false;
+
+    if (name_is_zygote(name)) { *is_zygote = true; return true; }
 
     for (const char* const* p = kAllowlistedPackages; *p; ++p) {
-        if (strcmp(cmdline, *p) == 0) return true;
+        if (strcmp(name, *p) == 0) return true;
     }
     return false;
 }
 
-static bool is_allowlisted_process() {
+static bool is_exempt_process() {
     static pid_t cached_pid = -1;
     static bool cached_value = false;
     pid_t cur = getpid();
     if (cur == cached_pid) return cached_value;
-    bool result = compute_allowlisted();
-    cached_value = result;
-    cached_pid = cur;
+
+    bool is_zygote = false;
+    bool result = compute_exempt(&is_zygote);
+
+    if (!is_zygote) {
+        cached_value = result;
+        cached_pid = cur;
+    }
     return result;
 }
 
 static bool is_app_process() {
     if ((getuid() % AID_USER_OFFSET) < AID_APP_START) return false;
-    if (is_allowlisted_process()) return false;
+    if (is_exempt_process()) return false;
     return true;
 }
 
