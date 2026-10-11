@@ -80,6 +80,15 @@ static const PrefixEntry kFrameworkDirs[] = {
     { nullptr, 0 }
 };
 
+static const PrefixEntry kOverlayDirs[] = {
+    PE("/system/overlay"),
+    PE("/system_ext/overlay"),
+    PE("/product/overlay"),
+    PE("/vendor/overlay"),
+    PE("/odm/overlay"),
+    { nullptr, 0 }
+};
+
 static const PrefixEntry kRomArtifactPrefixes[] = {
     PE("org.lineageos."),
     PE("org.libremobileos."),
@@ -328,6 +337,20 @@ static bool is_rom_framework_artifact(const char* path) {
     return basename_is_rom_artifact(slash ? slash + 1 : rest);
 }
 
+static bool is_rom_overlay(const char* path) {
+    const char* rest = nullptr;
+    for (const PrefixEntry* d = kOverlayDirs; d->str; ++d) {
+        if (strncmp(path, d->str, d->len) == 0 && path[d->len] == '/') {
+            rest = path + d->len + 1;
+            break;
+        }
+    }
+    if (!rest) return false;
+    const char* slash = strrchr(rest, '/');
+    const char* base = slash ? slash + 1 : rest;
+    return basename_is_rom_artifact(base) || name_has_rom_keyword(base);
+}
+
 static bool is_blocked_dir(const char* path) {
     const char* base = path_basename(path);
 
@@ -360,6 +383,7 @@ static bool is_rom_path(const char* path) {
 
     if (is_blocked_dir(clean)) return true;
     if (is_rom_framework_artifact(clean)) return true;
+    if (is_rom_overlay(clean)) return true;
     return false;
 }
 
@@ -400,6 +424,7 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
                 if (strcmp(base, *dn) == 0) { candidate = true; break; }
             }
             if (!candidate && basename_is_rom_artifact(base)) candidate = true;
+            if (!candidate && name_has_rom_keyword(base)) candidate = true;
         }
         if (candidate) {
             char dir_path[256];
@@ -545,6 +570,7 @@ static bool line_has_blocked_segment(const char* line) {
     if (!path) return false;
 
     if (is_rom_framework_artifact(path)) return true;
+    if (is_rom_overlay(path)) return true;
 
     for (const PrefixEntry* kw = kProcFilterKeywords; kw->str; ++kw) {
         const char* p = path;
