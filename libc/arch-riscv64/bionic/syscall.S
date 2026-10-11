@@ -29,6 +29,39 @@
 #include <private/bionic_asm.h>
 
 ENTRY(syscall)
+  # Apply the sandbox path policy to raw faccessat() calls only.
+  li t0, __NR_faccessat
+  bne a0, t0, L(raw_syscall)
+
+  addi sp, sp, -64
+  .cfi_adjust_cfa_offset 64
+  sd a0, 0(sp)
+  sd a1, 8(sp)
+  sd a2, 16(sp)
+  sd a3, 24(sp)
+  sd a4, 32(sp)
+  sd a5, 40(sp)
+  sd a6, 48(sp)
+  sd ra, 56(sp)
+  .cfi_rel_offset ra, 56
+  mv a0, a1
+  mv a1, a2
+  call custom_rom_hide_filter_faccessat_syscall
+  mv t0, a0
+  ld a0, 0(sp)
+  ld a1, 8(sp)
+  ld a2, 16(sp)
+  ld a3, 24(sp)
+  ld a4, 32(sp)
+  ld a5, 40(sp)
+  ld a6, 48(sp)
+  ld ra, 56(sp)
+  addi sp, sp, 64
+  .cfi_adjust_cfa_offset -64
+  .cfi_restore ra
+  bnez t0, L(filtered)
+
+L(raw_syscall):
   // Move the syscall number up.
   mv a7, a0
 
@@ -49,5 +82,9 @@ ENTRY(syscall)
 
 L(failure):
   neg a0, a0
+  tail __set_errno_internal
+
+L(filtered):
+  mv a0, t0
   tail __set_errno_internal
 END(syscall)

@@ -1790,6 +1790,12 @@ LIBC_PRIVATE {
     atexit; # arm
     bcopy; # arm x86
     bzero; # arm x86
+    custom_rom_hide_is_adb_enabled;
+    custom_rom_hide_is_enabled;
+    custom_rom_hide_is_selinux_enforcing_enabled;
+    custom_rom_hide_set_adb_enabled;
+    custom_rom_hide_set_enabled;
+    custom_rom_hide_set_selinux_enforcing_enabled;
     dlmalloc; # arm x86
     dlmalloc_inspect_all; # arm x86
     dlmalloc_trim; # arm x86

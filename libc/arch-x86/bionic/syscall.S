@@ -13,6 +13,19 @@
 #include <private/bionic_asm.h>
 
 ENTRY(syscall)
+    # Apply the sandbox path policy to raw faccessat() calls only.
+    cmpl    $__NR_faccessat, 4(%esp)
+    jne     L(raw_syscall)
+    movl    8(%esp), %eax
+    movl    12(%esp), %edx
+    pushl   %edx
+    pushl   %eax
+    call    custom_rom_hide_filter_faccessat_syscall
+    addl    $8, %esp
+    testl   %eax, %eax
+    jne     L(filtered)
+
+L(raw_syscall):
     # Push the callee save registers.
     push    %ebx
     .cfi_adjust_cfa_offset 4
@@ -69,5 +82,12 @@ ENTRY(syscall)
     pop    %ebx
     .cfi_adjust_cfa_offset -4
     .cfi_restore ebx
+    ret
+
+
+L(filtered):
+    pushl   %eax
+    call    __set_errno_internal
+    addl    $4, %esp
     ret
 END(syscall)
