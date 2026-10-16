@@ -31,6 +31,8 @@
 #include <async_safe/log.h>
 #include <cutils/misc.h>           // FIRST_APPLICATION_UID
 #include <errno.h>
+#include <sys/ioctl.h>
+#include <sys/socket.h>
 #include <linux/if_packet.h>
 #include <net/if.h>
 #include <netinet/in.h>
@@ -246,48 +248,78 @@ static void __getifaddrs_callback(void* context, nlmsghdr* hdr) {
   }
 }
 
-static void resolve_or_remove_nameless_interfaces(ifaddrs** list) {
+static int open_ifreq_socket() {
+  static constexpr int kFamilies[] = {AF_INET, AF_INET6, AF_UNIX};
+  int saved_errno = 0;
+  for (int family : kFamilies) {
+    int fd = socket(family, SOCK_DGRAM | SOCK_CLOEXEC, 0);
+    if (fd != -1) return fd;
+    if (saved_errno == 0) saved_errno = errno;
+  }
+  errno = saved_errno;
+  return -1;
+}
+
+static void copy_base_ifname(char* dst, size_t dst_size, const char* src) {
+  strlcpy(dst, src, dst_size);
+  char* colon = strchr(dst, ':');
+  if (colon != nullptr) *colon = '\0';
+}
+
+static void resolve_or_remove_nameless_interfaces(ifaddrs** list, int ioctl_fd) {
   ifaddrs_storage* addr = reinterpret_cast<ifaddrs_storage*>(*list);
   ifaddrs_storage* prev_addr = nullptr;
   while (addr != nullptr) {
     ifaddrs* next_addr = addr->ifa.ifa_next;
 
-    // Try resolving interfaces without a name first.
     if (strlen(addr->name) == 0) {
-      if (if_indextoname(addr->interface_index, addr->name) != nullptr) {
-        addr->ifa.ifa_name = addr->name;
+      for (const ifaddrs_storage* other = reinterpret_cast<const ifaddrs_storage*>(*list);
+           other != nullptr;
+           other = reinterpret_cast<const ifaddrs_storage*>(other->ifa.ifa_next)) {
+        if (other != addr && other->interface_index == addr->interface_index &&
+            other->name[0] != '\0') {
+          copy_base_ifname(addr->name, sizeof(addr->name), other->name);
+          break;
+        }
       }
     }
 
-    // If the interface could not be resolved, remove it.
+    if (strlen(addr->name) == 0 && ioctl_fd != -1) {
+      ifreq ifr = {};
+      ifr.ifr_ifindex = addr->interface_index;
+      if (ioctl(ioctl_fd, SIOCGIFNAME, &ifr) != -1) {
+        strlcpy(addr->name, ifr.ifr_name, sizeof(addr->name));
+      }
+    }
+
     if (strlen(addr->name) == 0) {
+      if_indextoname(addr->interface_index, addr->name);
+    }
+
+    if (strlen(addr->name) != 0) {
+      addr->ifa.ifa_name = addr->name;
+      prev_addr = addr;
+    } else {
       if (prev_addr == nullptr) {
         *list = next_addr;
       } else {
         prev_addr->ifa.ifa_next = next_addr;
       }
       free(addr);
-    } else {
-      prev_addr = addr;
     }
 
     addr = reinterpret_cast<ifaddrs_storage*>(next_addr);
   }
 }
 
-static void get_interface_flags_via_ioctl(ifaddrs** list) {
-  ScopedFd s(socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC, 0));
-  if (s.get() == -1) {
-    async_safe_format_log(ANDROID_LOG_ERROR, "libc",
-                          "socket(AF_INET, SOCK_DGRAM | SOCK_CLOEXEC) failed in ifaddrs: %m");
-    return;
-  }
+static void get_interface_flags_via_ioctl(ifaddrs** list, int ioctl_fd) {
+  if (ioctl_fd == -1) return;
 
   for (ifaddrs_storage* addr = reinterpret_cast<ifaddrs_storage*>(*list); addr != nullptr;
        addr = reinterpret_cast<ifaddrs_storage*>(addr->ifa.ifa_next)) {
     ifreq ifr = {};
     strlcpy(ifr.ifr_name, addr->ifa.ifa_name, sizeof(ifr.ifr_name));
-    if (ioctl(s.get(), SIOCGIFFLAGS, &ifr) != -1) {
+    if (ioctl(ioctl_fd, SIOCGIFFLAGS, &ifr) != -1) {
       addr->ifa.ifa_flags = ifr.ifr_flags;
     } else {
       async_safe_format_log(ANDROID_LOG_ERROR, "libc",
@@ -319,12 +351,18 @@ int getifaddrs(ifaddrs** out) {
   }
 
   if (!getlink_success) {
+    ErrnoRestorer errno_restorer;
+    ScopedFd s(open_ifreq_socket());
+    if (s.get() == -1) {
+      async_safe_format_log(ANDROID_LOG_ERROR, "libc",
+                            "no socket available for ifreq ioctls in ifaddrs: %m");
+    }
     // If we weren't able to depend on GETLINK messages, it's possible some
-    // interfaces never got their name set. Resolve them using if_indextoname or remove them.
-    resolve_or_remove_nameless_interfaces(out);
+    // interfaces never got their name set. Resolve them or remove them.
+    resolve_or_remove_nameless_interfaces(out, s.get());
     // Similarly, without GETLINK messages, interfaces will not have their flags set.
     // Resolve them using the SIOCGIFFLAGS ioctl call.
-    get_interface_flags_via_ioctl(out);
+    get_interface_flags_via_ioctl(out, s.get());
   }
 
   return 0;
