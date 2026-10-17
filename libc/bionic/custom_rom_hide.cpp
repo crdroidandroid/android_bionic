@@ -937,7 +937,6 @@ static void normalize_statfs_type(struct statfs* sf) {
 
 void custom_rom_hide_spoof_stat(const char* path, struct stat* sb) {
     if (!is_app_process() || !path || !sb) return;
-    if (strcmp(path, "/data/local/tmp") == 0) { sb->st_ino = 4223; return; }
     const PartitionDevEntry* e = find_partition_entry(path);
     if (e && major(sb->st_dev) != DM_MAJOR) sb->st_dev = makedev(DM_MAJOR, e->dm_minor);
 }
@@ -967,9 +966,6 @@ void custom_rom_hide_spoof_fd_stat(int fd, struct stat* sb) {
         struct stat real_sb;
         if (raw_fstatat(AT_FDCWD, real_path, &real_sb, 0) == 0) {
             *sb = real_sb;
-        } else {
-            sb->st_dev = makedev(0, 0);
-            sb->st_ino = 0;
         }
     }
     errno = saved_errno;
@@ -986,10 +982,6 @@ void custom_rom_hide_spoof_fd_statx(int fd, unsigned mask, struct statx* sx) {
         struct statx real_sx;
         if (raw_statx(AT_FDCWD, real_path, 0, mask, &real_sx) == 0) {
             *sx = real_sx;
-        } else {
-            sx->stx_dev_major = 0;
-            sx->stx_dev_minor = 0;
-            sx->stx_ino = 0;
         }
     }
     errno = saved_errno;
