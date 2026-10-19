@@ -953,15 +953,21 @@ void custom_rom_hide_spoof_statfs(const char* path, struct statfs* sf) {
 
 void custom_rom_hide_spoof_fd_stat(int fd, struct stat* sb) {
     if (fd < 0 || !sb) return;
-    if (!is_tracked_fd(fd)) return;
     if (!is_app_process()) return;
 
     int saved_errno = errno;
-    char real_path[512];
-    if (resolve_encoded_memfd_path(fd, real_path, sizeof(real_path))) {
-        struct stat real_sb;
-        if (raw_fstatat(AT_FDCWD, real_path, &real_sb, 0) == 0) {
-            *sb = real_sb;
+    if (is_tracked_fd(fd)) {
+        char real_path[512];
+        if (resolve_encoded_memfd_path(fd, real_path, sizeof(real_path))) {
+            struct stat real_sb;
+            if (raw_fstatat(AT_FDCWD, real_path, &real_sb, 0) == 0) {
+                *sb = real_sb;
+            }
+        }
+    } else if (S_ISDIR(sb->st_mode) && major(sb->st_dev) != DM_MAJOR) {
+        char fd_path[512];
+        if (resolve_fd_path(fd, fd_path, sizeof(fd_path))) {
+            custom_rom_hide_spoof_stat(fd_path, sb);
         }
     }
     errno = saved_errno;
@@ -969,15 +975,22 @@ void custom_rom_hide_spoof_fd_stat(int fd, struct stat* sb) {
 
 void custom_rom_hide_spoof_fd_statx(int fd, unsigned mask, struct statx* sx) {
     if (fd < 0 || !sx) return;
-    if (!is_tracked_fd(fd)) return;
     if (!is_app_process()) return;
 
     int saved_errno = errno;
-    char real_path[512];
-    if (resolve_encoded_memfd_path(fd, real_path, sizeof(real_path))) {
-        struct statx real_sx;
-        if (raw_statx(AT_FDCWD, real_path, 0, mask, &real_sx) == 0) {
-            *sx = real_sx;
+    if (is_tracked_fd(fd)) {
+        char real_path[512];
+        if (resolve_encoded_memfd_path(fd, real_path, sizeof(real_path))) {
+            struct statx real_sx;
+            if (raw_statx(AT_FDCWD, real_path, 0, mask, &real_sx) == 0) {
+                *sx = real_sx;
+            }
+        }
+    } else if ((sx->stx_mode == 0 || S_ISDIR(sx->stx_mode)) &&
+               sx->stx_dev_major != DM_MAJOR) {
+        char fd_path[512];
+        if (resolve_fd_path(fd, fd_path, sizeof(fd_path))) {
+            custom_rom_hide_spoof_statx(fd_path, sx);
         }
     }
     errno = saved_errno;
