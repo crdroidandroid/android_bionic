@@ -383,7 +383,6 @@ static bool is_rom_path(const char* path) {
 
     if (is_blocked_dir(clean)) return true;
     if (is_rom_framework_artifact(clean)) return true;
-    if (is_rom_overlay(clean)) return true;
     return false;
 }
 
@@ -424,7 +423,6 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
                 if (strcmp(base, *dn) == 0) { candidate = true; break; }
             }
             if (!candidate && basename_is_rom_artifact(base)) candidate = true;
-            if (!candidate && name_has_rom_keyword(base)) candidate = true;
         }
         if (candidate) {
             char dir_path[256];
@@ -465,11 +463,9 @@ bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
         char full_path[640];
         int n = snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, name);
         if (n > 0 && static_cast<size_t>(n) < sizeof(full_path)) {
-            if (is_rom_path(full_path)) {
-                result = true;
-            } else if (dir_is_config(dir_path) && name_has_rom_keyword(name)) {
-                result = true;
-            }
+            // Overlays are hidden from listings only: apps open their own RROs by path.
+            result = is_rom_path(full_path) || is_rom_overlay(full_path) ||
+                     (dir_is_config(dir_path) && name_has_rom_keyword(name));
         }
     }
 
