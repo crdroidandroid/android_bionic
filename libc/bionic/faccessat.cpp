@@ -58,15 +58,10 @@ int faccessat(int dirfd, const char* pathname, int mode, int flags) {
     return -1;
   }
 
-  int result = __faccessat(dirfd, pathname, mode);
-  if (result == -1) {
-    return -1;
-  }
-
   if (custom_rom_hide_should_block_at(dirfd, pathname)) {
     errno = ENOENT;
     return -1;
   }
 
-  return result;
+  return __faccessat(dirfd, pathname, mode);
 }
