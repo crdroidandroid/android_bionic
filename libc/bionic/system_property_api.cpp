@@ -78,7 +78,8 @@ const prop_info* __system_property_find(const char* name) {
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
 int __system_property_read(const prop_info* pi, char* name, char* value) {
   int len = system_properties.Read(pi, name, value);
-  if (name && custom_rom_hide_should_spoof_prop(name, value)) {
+  const char* prop_name = name ? name : (pi ? pi->name : nullptr);
+  if (prop_name && custom_rom_hide_should_spoof_prop(prop_name, value)) {
     return strlen(value);
   }
   return len;
