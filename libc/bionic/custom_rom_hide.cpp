@@ -248,6 +248,8 @@ static bool read_cmdline_name(char* out, size_t out_size) {
 }
 
 static bool name_is_zygote(const char* name) {
+    if (strcmp(name, "app_process") == 0 || strcmp(name, "app_process64") == 0 ||
+        strcmp(name, "app_process32") == 0) return true;
     size_t len = strlen(name);
     static const char kZygoteSuffix[] = "_zygote";
     size_t slen = sizeof(kZygoteSuffix) - 1;
@@ -261,7 +263,10 @@ static bool compute_exempt(bool* is_zygote) {
     *is_zygote = false;
 
     char name[256];
-    if (!read_cmdline_name(name, sizeof(name))) return false;
+    if (!read_cmdline_name(name, sizeof(name)) || name[0] == '\0') {
+        *is_zygote = true;
+        return true;
+    }
 
     if (name_is_zygote(name)) { *is_zygote = true; return true; }
 
@@ -272,17 +277,18 @@ static bool compute_exempt(bool* is_zygote) {
 }
 
 static bool is_exempt_process() {
-    static pid_t cached_pid = -1;
-    static bool cached_value = false;
+    static _Atomic(pid_t) cached_pid = -1;
+    static _Atomic(bool) cached_value = false;
     pid_t cur = getpid();
-    if (cur == cached_pid) return cached_value;
+    if (atomic_load_explicit(&cached_pid, memory_order_acquire) == cur) {
+        return atomic_load_explicit(&cached_value, memory_order_relaxed);
+    }
 
     bool is_zygote = false;
     bool result = compute_exempt(&is_zygote);
-
     if (!is_zygote) {
-        cached_value = result;
-        cached_pid = cur;
+        atomic_store_explicit(&cached_value, result, memory_order_relaxed);
+        atomic_store_explicit(&cached_pid, cur, memory_order_release);
     }
     return result;
 }
@@ -388,7 +394,7 @@ static bool is_rom_path(const char* path) {
 
 static bool resolve_fd_path(int fd, char* buf, size_t size) {
     char proc_link[64];
-    if (fd < 0) return false;
+    if (fd < 0 || !buf || size < 2) return false;
     snprintf(proc_link, sizeof(proc_link), "/proc/self/fd/%d", fd);
     ssize_t n = raw_readlinkat(proc_link, buf, size - 1);
     if (n > 0) {
@@ -428,8 +434,10 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
             char dir_path[256];
             if (resolve_fd_path(dirfd, dir_path, sizeof(dir_path))) {
                 char full_path[512];
-                snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, path);
-                result = is_rom_path(full_path);
+                int n = snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, path);
+                if (n > 0 && static_cast<size_t>(n) < sizeof(full_path)) {
+                    result = is_rom_path(full_path);
+                }
             }
         }
     }
@@ -475,7 +483,11 @@ bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
 
 static int create_encoded_memfd(const char* path) {
     char memfd_name[250];
-    snprintf(memfd_name, sizeof(memfd_name), HIDE_MEMFD_NAME_PREFIX "%s", path);
+    int n = snprintf(memfd_name, sizeof(memfd_name), HIDE_MEMFD_NAME_PREFIX "%s", path);
+    if (n < 0 || static_cast<size_t>(n) >= sizeof(memfd_name)) {
+        errno = ENAMETOOLONG;
+        return -1;
+    }
     int fd = raw_memfd_create(memfd_name, 0);
     if (fd >= 0) register_fd(fd);
     return fd;
@@ -506,26 +518,53 @@ static bool resolve_encoded_memfd_path(int fd, char* out, size_t out_size) {
     return decoded;
 }
 
-ssize_t custom_rom_hide_readlink_post(char* buf, size_t size, ssize_t ret) {
-    if (ret <= 0 || !is_app_process()) return ret;
-
-    if (ret > static_cast<ssize_t>(HIDE_MEMFD_LINK_PREFIX_LEN) &&
-        strncmp(buf, HIDE_MEMFD_LINK_PREFIX, HIDE_MEMFD_LINK_PREFIX_LEN) == 0) {
-        char temp[512];
-        size_t copy_len = static_cast<size_t>(ret) < sizeof(temp) - 1 ? static_cast<size_t>(ret) : sizeof(temp) - 1;
-        memcpy(temp, buf, copy_len);
-        temp[copy_len] = '\0';
-
-        char real_path[512];
-        if (!decode_encoded_memfd_link(temp, real_path, sizeof(real_path))) return ret;
-        size_t real_len = strlen(real_path);
-
-        if (real_len > 0 && real_len <= size) {
-            memcpy(buf, real_path, real_len);
-            return static_cast<ssize_t>(real_len);
-        }
+static bool is_tracked_proc_fd_link(const char* path) {
+    if (!path) return false;
+    const char* number = nullptr;
+    if (strncmp(path, "/proc/self/fd/", 14) == 0) number = path + 14;
+    else if (strncmp(path, "/proc/thread-self/fd/", 21) == 0) number = path + 21;
+    else if (strncmp(path, "/proc/", 6) == 0) {
+        const char* p = path + 6;
+        char* next = nullptr;
+        long pid = strtol(p, &next, 10);
+        if (p == next || pid != getpid() || strncmp(next, "/fd/", 4) != 0) return false;
+        number = next + 4;
     }
-    return ret;
+    if (!number || *number < '0' || *number > '9') return false;
+    char* end = nullptr;
+    long fd = strtol(number, &end, 10);
+    return end && *end == '\0' && fd >= 0 && fd < HIDE_TRACKED_FD_LIMIT &&
+           is_tracked_fd(static_cast<int>(fd));
+}
+
+ssize_t custom_rom_hide_readlinkat_post(int dirfd, const char* path, char* buf,
+                                        size_t size, ssize_t ret) {
+    if (ret <= 0 || !buf || !is_app_process()) return ret;
+    int saved_errno = errno;
+    bool has_prefix = ret >= static_cast<ssize_t>(HIDE_MEMFD_LINK_PREFIX_LEN) &&
+                      memcmp(buf, HIDE_MEMFD_LINK_PREFIX, HIDE_MEMFD_LINK_PREFIX_LEN) == 0;
+    if (!has_prefix && !is_tracked_proc_fd_link(path)) {
+        errno = saved_errno;
+        return ret;
+    }
+
+    char link[512];
+    ssize_t n = syscall(__NR_readlinkat, dirfd, path, link, sizeof(link) - 1);
+    if (n <= 0 || static_cast<size_t>(n) >= sizeof(link) - 1) {
+        errno = saved_errno;
+        return ret;
+    }
+    link[n] = '\0';
+    char real_path[512];
+    if (!decode_encoded_memfd_link(link, real_path, sizeof(real_path))) {
+        errno = saved_errno;
+        return ret;
+    }
+    size_t path_len = strlen(real_path);
+    size_t to_copy = path_len < size ? path_len : size;
+    memcpy(buf, real_path, to_copy);
+    errno = saved_errno;
+    return static_cast<ssize_t>(to_copy);
 }
 
 enum ProcFilterType {
@@ -600,35 +639,67 @@ static bool should_filter_line(ProcFilterType type, const char* line) {
 }
 
 static char* read_file_raw(const char* path, size_t* out_size) {
-    int fd = raw_openat(path, O_RDONLY);
+    int fd = raw_openat(path, O_RDONLY | O_CLOEXEC);
     if (fd < 0) return nullptr;
 
+    constexpr size_t kMaxFileBytes = 64 * 1024 * 1024;
     size_t capacity = 16384;
     size_t size = 0;
     char* buf = static_cast<char*>(malloc(capacity));
     if (!buf) { raw_close(fd); return nullptr; }
 
-    ssize_t n;
-    while ((n = raw_read(fd, buf + size, capacity - size - 1)) > 0) {
-        size += n;
-        if (size >= capacity - 1) {
-            capacity *= 2;
-            char* new_buf = static_cast<char*>(realloc(buf, capacity));
-            if (!new_buf) { free(buf); raw_close(fd); return nullptr; }
-            buf = new_buf;
+    while (true) {
+        if (size == capacity - 1) {
+            if (capacity >= kMaxFileBytes + 1) {
+                errno = EFBIG;
+                break;
+            }
+            size_t grown = capacity * 2;
+            if (grown > kMaxFileBytes + 1) grown = kMaxFileBytes + 1;
+            char* next = static_cast<char*>(realloc(buf, grown));
+            if (!next) break;
+            buf = next;
+            capacity = grown;
         }
+        ssize_t n = raw_read(fd, buf + size, capacity - size - 1);
+        if (n > 0) { size += static_cast<size_t>(n); continue; }
+        if (n == 0) {
+            buf[size] = '\0';
+            raw_close(fd);
+            *out_size = size;
+            return buf;
+        }
+        if (errno == EINTR) continue;
+        break;
     }
+    int saved_errno = errno;
+    free(buf);
     raw_close(fd);
-    buf[size] = '\0';
-    *out_size = size;
-    return buf;
+    errno = saved_errno;
+    return nullptr;
 }
 
 typedef bool (*LinePredicate)(const char* line, void* ctx);
-typedef void (*LineWriter)(int mem_fd, char* line, size_t line_len, void* ctx);
+typedef bool (*LineWriter)(int mem_fd, char* line, size_t line_len, void* ctx);
 
-static void write_line_raw(int mem_fd, char* line, size_t line_len, void*) {
-    raw_write(mem_fd, line, line_len);
+static bool raw_write_all(int fd, const void* buffer, size_t size) {
+    const char* data = static_cast<const char*>(buffer);
+    while (size != 0) {
+        ssize_t n = raw_write(fd, data, size);
+        if (n > 0) {
+            size -= static_cast<size_t>(n);
+            data += n;
+            continue;
+        }
+        if (n < 0 && errno == EINTR) continue;
+        if (n == 0) errno = EIO;
+        return false;
+    }
+    return true;
+}
+
+static bool write_line_raw(int fd, char* line, size_t len, void*) {
+    return raw_write_all(fd, line, len);
 }
 
 static int filter_file_with(const char* path, LinePredicate drop, LineWriter writer, void* ctx) {
@@ -642,22 +713,31 @@ static int filter_file_with(const char* path, LinePredicate drop, LineWriter wri
         return -1;
     }
 
+    bool ok = true;
     char* pos = content;
-    while (*pos) {
-        char* eol = strchr(pos, '\n');
-        size_t line_len = eol ? static_cast<size_t>(eol - pos + 1) : strlen(pos);
+    char* end = content + file_size;
+    while (pos < end) {
+        char* eol = static_cast<char*>(memchr(pos, '\n', end - pos));
+        size_t line_len = eol ? static_cast<size_t>(eol - pos + 1)
+                              : static_cast<size_t>(end - pos);
         char saved = pos[line_len];
         pos[line_len] = '\0';
-        if (!drop || !drop(pos, ctx)) {
-            (writer ? writer : write_line_raw)(mem_fd, pos, line_len, ctx);
+        if ((!drop || !drop(pos, ctx)) &&
+            !(writer ? writer : write_line_raw)(mem_fd, pos, line_len, ctx)) {
+            ok = false;
         }
         pos[line_len] = saved;
+        if (!ok) break;
         pos += line_len;
     }
 
     free(content);
-    raw_lseek(mem_fd, 0, SEEK_SET);
-    return mem_fd;
+    if (ok && raw_lseek(mem_fd, 0, SEEK_SET) >= 0) return mem_fd;
+    int saved_errno = errno;
+    custom_rom_hide_unregister_fd(mem_fd);
+    raw_close(mem_fd);
+    errno = saved_errno;
+    return -1;
 }
 
 static void replace_all_cmdline(char* content, size_t len, const char* needle, size_t needle_len,
@@ -681,12 +761,12 @@ static void replace_all_cmdline(char* content, size_t len, const char* needle, s
                             sizeof(replacement) - 1); \
     } while (false)
 
-static void filter_cmdline(int mem_fd, char* content, size_t len) {
+static bool filter_cmdline(int mem_fd, char* content, size_t len) {
     REPLACE_CMDLINE_LITERAL(content, len, "androidboot.verifiedbootstate=orange", "androidboot.verifiedbootstate=green ");
     REPLACE_CMDLINE_LITERAL(content, len, "androidboot.verifiedbootstate=yellow", "androidboot.verifiedbootstate=green ");
     REPLACE_CMDLINE_LITERAL(content, len, "androidboot.flash.locked=0", "androidboot.flash.locked=1");
     REPLACE_CMDLINE_LITERAL(content, len, "androidboot.vbmeta.device_state=unlocked", "androidboot.vbmeta.device_state=locked  ");
-    raw_write(mem_fd, content, strnlen(content, len));
+    return raw_write_all(mem_fd, content, strnlen(content, len));
 }
 
 struct MountDm { const char* mnt; const char* dev; };
@@ -699,7 +779,7 @@ static const MountDm kMountDm[] = {
     { nullptr,         nullptr },
 };
 
-static void write_spoofed_mount_line(int mem_fd, char* line, size_t line_len, void*) {
+static bool write_spoofed_mount_line(int mem_fd, char* line, size_t line_len, void*) {
     char* rw_delim = strstr(line, ",rw,");
     if (rw_delim) { rw_delim[1] = 'r'; rw_delim[2] = 'o'; }
     rw_delim = strstr(line, " rw,");
@@ -724,14 +804,13 @@ static void write_spoofed_mount_line(int mem_fd, char* line, size_t line_len, vo
             if (dev_start) {
                 char* dev_end = strchr(dev_start, ' ');
                 if (!dev_end) dev_end = dev_start + strlen(dev_start);
-                raw_write(mem_fd, line, dev_start - line);
-                raw_write(mem_fd, replacement, strlen(replacement));
-                raw_write(mem_fd, dev_end, line_len - (dev_end - line));
-                return;
+                return raw_write_all(mem_fd, line, dev_start - line) &&
+                       raw_write_all(mem_fd, replacement, strlen(replacement)) &&
+                       raw_write_all(mem_fd, dev_end, line_len - (dev_end - line));
             }
         }
     }
-    raw_write(mem_fd, line, line_len);
+    return raw_write_all(mem_fd, line, line_len);
 }
 
 static bool drop_proc_line(const char* line, void* ctx) {
@@ -761,19 +840,35 @@ int custom_rom_hide_filter_proc(const char* path) {
     int mem_fd = create_encoded_memfd(path);
     if (mem_fd < 0) { free(content); errno = saved_errno; return -1; }
 
-    filter_cmdline(mem_fd, content, file_size);
-
+    bool ok = filter_cmdline(mem_fd, content, file_size);
     free(content);
-    raw_lseek(mem_fd, 0, SEEK_SET);
+    if (!ok || raw_lseek(mem_fd, 0, SEEK_SET) < 0) {
+        custom_rom_hide_unregister_fd(mem_fd);
+        raw_close(mem_fd);
+        errno = saved_errno;
+        return -1;
+    }
     errno = saved_errno;
     return mem_fd;
 }
 
 static bool is_selinux_policy_path(const char* path) {
-    if (!strstr(path, "/selinux/")) return false;
+    static const PrefixEntry kSelinuxDirs[] = {
+        PE("/system/etc/selinux"), PE("/system_ext/etc/selinux"),
+        PE("/product/etc/selinux"), PE("/vendor/etc/selinux"),
+        PE("/odm/etc/selinux"), {nullptr, 0}
+    };
+    bool in_system_policy_dir = false;
+    for (const PrefixEntry* entry = kSelinuxDirs; entry->str; ++entry) {
+        if (strncmp(path, entry->str, entry->len) == 0 && path[entry->len] == '/') {
+            in_system_policy_dir = true;
+            break;
+        }
+    }
+    if (!in_system_policy_dir) return false;
     const char* base = path_basename(path);
-    return strstr(base, "_contexts") != nullptr
-        || strstr(base, "sepolicy.cil") != nullptr;
+    return strstr(base, "_contexts") != nullptr ||
+           strstr(base, "sepolicy.cil") != nullptr;
 }
 
 static bool line_has_rom_keyword(const char* line) {

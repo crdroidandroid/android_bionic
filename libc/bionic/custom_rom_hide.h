@@ -19,6 +19,7 @@
 
 #include <sys/cdefs.h>
 #include <stdbool.h>
+#include <sys/types.h>
 #include <sys/stat.h>
 
 struct statfs;
@@ -49,6 +50,7 @@ bool custom_rom_hide_should_spoof_prop(const char* name, char* value);
 bool custom_rom_hide_should_hide_prop(const char* name);
 const char* custom_rom_hide_get_prop_override(const char* name);
 
-ssize_t custom_rom_hide_readlink_post(char* buf, size_t size, ssize_t ret);
+ssize_t custom_rom_hide_readlinkat_post(int dirfd, const char* path, char* buf,
+                                         size_t size, ssize_t ret);
 
 __END_DECLS

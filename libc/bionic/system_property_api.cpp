@@ -119,13 +119,7 @@ static void read_callback_intercept(void* cookie, const char* name, const char* 
         return;
     }
 
-    uint32_t final_serial = serial;
-    if (is_ro) {
-        uint32_t len = strlen(value);
-        final_serial = (len < PROP_VALUE_MAX) ? (len << 24) : ((50 << 24) | (1 << 16));
-    }
-
-    ctx->original_callback(ctx->original_cookie, name, value, final_serial);
+    ctx->original_callback(ctx->original_cookie, name, value, serial);
 }
 
 __BIONIC_WEAK_FOR_NATIVE_BRIDGE
@@ -184,15 +178,6 @@ uint32_t __system_property_serial(const prop_info* pi) {
           return (len < PROP_VALUE_MAX) ? (len << 24) : ((50 << 24) | (1 << 16));
       } else {
           return (real_serial & 0xffffff) | (len << 24);
-      }
-  }
-
-  if (is_ro) {
-      if ((real_serial & (1 << 16)) != 0) {
-          return (50 << 24) | (1 << 16);
-      } else {
-          uint32_t len = real_serial >> 24;
-          return len << 24;
       }
   }
 

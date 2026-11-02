@@ -53,5 +53,5 @@ ssize_t readlinkat(int dirfd, const char* path, char* buf, size_t size) {
   }
 
   ssize_t ret = __readlinkat(dirfd, path, buf, size);
-  return custom_rom_hide_readlink_post(buf, size, ret);
+  return custom_rom_hide_readlinkat_post(dirfd, path, buf, size, ret);
 }
