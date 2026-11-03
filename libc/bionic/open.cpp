@@ -52,18 +52,21 @@ static inline bool needs_mode(int flags) {
 
 static inline bool can_filter_open(int flags) {
   return (flags & O_ACCMODE) == O_RDONLY &&
-         (flags & (O_CREAT | O_TRUNC | O_TMPFILE | O_PATH | O_DIRECTORY | O_NOFOLLOW)) == 0;
+         (flags & (O_CREAT | O_TRUNC | O_TMPFILE | O_PATH | O_DIRECTORY)) == 0;
 }
 
 static int filter_readonly_file(const char* path, int flags) {
   if (!path || path[0] != '/' || !can_filter_open(flags)) return -1;
   int fd = custom_rom_hide_filter_proc(path);
-  if (fd >= 0) return fd;
-  fd = custom_rom_hide_filter_vintf(path);
-  if (fd >= 0) return fd;
-  fd = custom_rom_hide_filter_sepolicy(path);
-  if (fd >= 0) return fd;
-  return -1;
+  if (fd < 0) fd = custom_rom_hide_filter_vintf(path);
+  if (fd < 0) fd = custom_rom_hide_filter_sepolicy(path);
+  // O_NOFOLLOW only concerns the last component: regular files such as /proc/cmdline are
+  // substituted as usual, while a symlink such as /proc/mounts must still fail with ELOOP.
+  if (fd >= 0 && (flags & O_NOFOLLOW) && custom_rom_hide_is_symlink(path)) {
+    close(fd);
+    return -1;
+  }
+  return fd;
 }
 
 static inline int finish_filtered(int filtered_fd, int flags) {

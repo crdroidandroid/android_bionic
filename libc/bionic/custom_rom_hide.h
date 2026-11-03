@@ -32,6 +32,7 @@ bool custom_rom_hide_is_app_process();
 bool custom_rom_hide_should_block(const char* path);
 bool custom_rom_hide_should_block_at(int dirfd, const char* path);
 bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name);
+bool custom_rom_hide_is_symlink(const char* path);
 
 void custom_rom_hide_spoof_stat(const char* path, struct stat* sb);
 void custom_rom_hide_spoof_statx(const char* path, struct statx* sx);

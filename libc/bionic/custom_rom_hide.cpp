@@ -446,6 +446,14 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
     return result;
 }
 
+bool custom_rom_hide_is_symlink(const char* path) {
+    int saved_errno = errno;
+    struct stat sb;
+    bool result = raw_fstatat(AT_FDCWD, path, &sb, AT_SYMLINK_NOFOLLOW) == 0 && S_ISLNK(sb.st_mode);
+    errno = saved_errno;
+    return result;
+}
+
 bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
     if (!name || reinterpret_cast<uintptr_t>(name) < 0x1000000) return false;
     if (!is_app_process()) return false;
