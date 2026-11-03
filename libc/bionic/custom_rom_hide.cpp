@@ -23,6 +23,7 @@
 #include <linux/magic.h>
 #include <linux/memfd.h>
 #include <linux/stat.h>
+#include <pthread.h>
 #include <stdio.h>
 #include <stdatomic.h>
 #include <stdlib.h>
@@ -33,6 +34,7 @@
 #include <sys/sysmacros.h>
 #include <unistd.h>
 #include <private/android_filesystem_config.h>
+#include <private/bionic_lock.h>
 
 #define HIDE_MEMFD_TAG "mf"
 #define HIDE_MEMFD_NAME_PREFIX HIDE_MEMFD_TAG ":"
@@ -171,18 +173,91 @@ static void register_fd(int fd) {
                              memory_order_release);
 }
 
+// Metadata of the real file, captured when the substitution is created while the
+// canonical path still resolves. It is the fallback for fstat/statx once that path
+// no longer resolves — a file opened through /proc/thread-self by a thread that has
+// exited, or a substituted file of another process that has gone. Indexed by fd,
+// parallel to g_substituted_fd_bits.
+//
+// g_fd_meta_lock guards both the pointers and the lifetime of the records: a reader
+// copies the record out under the lock, so a concurrent store/clear that frees the
+// old record (e.g. dup2 over an fd another thread is stat-ing) cannot free it while
+// the reader still dereferences it.
+struct FdMeta {
+    struct stat sb;
+    struct statx sx;
+    bool sb_ok;
+    bool sx_ok;
+};
+
+static constexpr unsigned kStatxCaptureMask = STATX_ALL | STATX_DIOALIGN |
+        STATX_MNT_ID_UNIQUE | STATX_SUBVOL | STATX_WRITE_ATOMIC | STATX_DIO_READ_ALIGN;
+
+static FdMeta* g_fd_meta[HIDE_TRACKED_FD_LIMIT];
+static Lock g_fd_meta_lock;
+static pthread_once_t g_fd_meta_atfork_once = PTHREAD_ONCE_INIT;
+
+static void prepare_fd_meta_fork() { g_fd_meta_lock.lock(); }
+static void parent_fd_meta_fork() { g_fd_meta_lock.unlock(); }
+static void child_fd_meta_fork() { g_fd_meta_lock.init(false); }
+
+static void register_fd_meta_atfork() {
+    pthread_atfork(prepare_fd_meta_fork, parent_fd_meta_fork, child_fd_meta_fork);
+}
+
+static void clear_fd_meta(int fd) {
+    if (!is_trackable_fd(fd)) return;
+    g_fd_meta_lock.lock();
+    FdMeta* prev = g_fd_meta[fd];
+    g_fd_meta[fd] = nullptr;
+    g_fd_meta_lock.unlock();
+    free(prev);
+}
+
+static void store_fd_meta(int fd, const FdMeta* meta) {
+    if (!is_trackable_fd(fd)) return;
+    FdMeta* copy = static_cast<FdMeta*>(malloc(sizeof(FdMeta)));
+    if (!copy) {
+        clear_fd_meta(fd);
+        return;
+    }
+    *copy = *meta;
+    g_fd_meta_lock.lock();
+    FdMeta* prev = g_fd_meta[fd];
+    g_fd_meta[fd] = copy;
+    g_fd_meta_lock.unlock();
+    free(prev);
+}
+
+static bool load_fd_meta(int fd, FdMeta* out) {
+    if (!is_trackable_fd(fd)) return false;
+    bool ok = false;
+    g_fd_meta_lock.lock();
+    if (g_fd_meta[fd]) { *out = *g_fd_meta[fd]; ok = true; }
+    g_fd_meta_lock.unlock();
+    return ok;
+}
+
 void custom_rom_hide_unregister_fd(int fd) {
     if (!is_trackable_fd(fd)) return;
     uint64_t bit = 1ULL << (fd % HIDE_TRACKED_FD_WORD_BITS);
     _Atomic(uint64_t)* word = &g_substituted_fd_bits[fd / HIDE_TRACKED_FD_WORD_BITS];
+    // close() routes here for every fd; an untracked one must not touch the meta lock.
     if ((atomic_load_explicit(word, memory_order_acquire) & bit) == 0) return;
     atomic_fetch_and_explicit(word, ~bit, memory_order_release);
+    clear_fd_meta(fd);
 }
 
 void custom_rom_hide_transfer_fd(int old_fd, int new_fd) {
     if (new_fd < 0 || old_fd == new_fd) return;
-    if (is_tracked_fd(old_fd)) register_fd(new_fd);
-    else custom_rom_hide_unregister_fd(new_fd);
+    if (is_tracked_fd(old_fd)) {
+        FdMeta meta;
+        if (load_fd_meta(old_fd, &meta)) store_fd_meta(new_fd, &meta);
+        else clear_fd_meta(new_fd);
+        register_fd(new_fd);
+    } else {
+        custom_rom_hide_unregister_fd(new_fd);
+    }
 }
 
 static inline int raw_openat(const char* path, int flags) {
@@ -489,7 +564,24 @@ bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
     return result;
 }
 
+// Descriptor links expose the resolved proc path, not the alias used to open it.
+static const char* canonicalize_proc_path(const char* path, char* resolved, size_t size) {
+    if (strncmp(path, "/proc/", 6) != 0) return path;
+
+    int saved_errno = errno;
+    int fd = raw_openat(path, O_PATH | O_CLOEXEC);
+    if (fd >= 0) {
+        if (resolve_fd_path(fd, resolved, size)) path = resolved;
+        raw_close(fd);
+    }
+    errno = saved_errno;
+    return path;
+}
+
 static int create_encoded_memfd(const char* path) {
+    char resolved_path[512];
+    path = canonicalize_proc_path(path, resolved_path, sizeof(resolved_path));
+
     char memfd_name[250];
     int n = snprintf(memfd_name, sizeof(memfd_name), HIDE_MEMFD_NAME_PREFIX "%s", path);
     if (n < 0 || static_cast<size_t>(n) >= sizeof(memfd_name)) {
@@ -497,7 +589,20 @@ static int create_encoded_memfd(const char* path) {
         return -1;
     }
     int fd = raw_memfd_create(memfd_name, 0);
-    if (fd >= 0) register_fd(fd);
+    if (fd >= 0) {
+        pthread_once(&g_fd_meta_atfork_once, register_fd_meta_atfork);
+        int saved_errno = errno;
+        FdMeta meta = {};
+        meta.sb_ok = raw_fstatat(AT_FDCWD, path, &meta.sb, 0) == 0;
+        // Older kernels can reject the newest mask bits; STATX_ALL is the compatibility floor.
+        meta.sx_ok = raw_statx(AT_FDCWD, path, 0, kStatxCaptureMask, &meta.sx) == 0;
+        if (!meta.sx_ok && errno == EINVAL) {
+            meta.sx_ok = raw_statx(AT_FDCWD, path, 0, STATX_ALL, &meta.sx) == 0;
+        }
+        if (meta.sb_ok || meta.sx_ok) store_fd_meta(fd, &meta);
+        errno = saved_errno;
+        register_fd(fd);
+    }
     return fd;
 }
 
@@ -1060,12 +1165,16 @@ void custom_rom_hide_spoof_fd_stat(int fd, struct stat* sb) {
 
     int saved_errno = errno;
     if (is_tracked_fd(fd)) {
+        // resolve_encoded_memfd_path gates on the memfd link still decoding, so a stale
+        // tracking bit on a reused fd number self-heals instead of reporting old metadata.
         char real_path[512];
         if (resolve_encoded_memfd_path(fd, real_path, sizeof(real_path))) {
+            // The live path is exact when it still resolves; the captured record covers
+            // the case where the task it named has gone.
             struct stat real_sb;
-            if (raw_fstatat(AT_FDCWD, real_path, &real_sb, 0) == 0) {
-                *sb = real_sb;
-            }
+            FdMeta meta;
+            if (raw_fstatat(AT_FDCWD, real_path, &real_sb, 0) == 0) *sb = real_sb;
+            else if (load_fd_meta(fd, &meta) && meta.sb_ok) *sb = meta.sb;
         }
     } else if (S_ISDIR(sb->st_mode) && major(sb->st_dev) != DM_MAJOR) {
         char fd_path[512];
@@ -1084,10 +1193,12 @@ void custom_rom_hide_spoof_fd_statx(int fd, unsigned mask, struct statx* sx) {
     if (is_tracked_fd(fd)) {
         char real_path[512];
         if (resolve_encoded_memfd_path(fd, real_path, sizeof(real_path))) {
+            // The live path honors the caller's mask exactly; the captured record is
+            // the fallback for when the task it named has gone.
             struct statx real_sx;
-            if (raw_statx(AT_FDCWD, real_path, 0, mask, &real_sx) == 0) {
-                *sx = real_sx;
-            }
+            FdMeta meta;
+            if (raw_statx(AT_FDCWD, real_path, 0, mask, &real_sx) == 0) *sx = real_sx;
+            else if (load_fd_meta(fd, &meta) && meta.sx_ok) *sx = meta.sx;
         }
     } else if ((sx->stx_mode == 0 || S_ISDIR(sx->stx_mode)) &&
                sx->stx_dev_major != DM_MAJOR) {
