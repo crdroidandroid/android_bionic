@@ -72,7 +72,9 @@ int open(const char* pathname, int flags, ...) {
     va_end(args);
   }
 
-  int filtered_fd = custom_rom_hide_filter_proc(pathname);
+  int filtered_fd = custom_rom_hide_filter_selinux_enforce_at(AT_FDCWD, pathname, flags);
+  if (filtered_fd >= 0) return FDTRACK_CREATE(finish_filtered(filtered_fd, flags));
+  filtered_fd = custom_rom_hide_filter_proc(pathname);
   if (filtered_fd >= 0) return FDTRACK_CREATE(finish_filtered(filtered_fd, flags));
   filtered_fd = custom_rom_hide_filter_vintf(pathname);
   if (filtered_fd >= 0) return FDTRACK_CREATE(finish_filtered(filtered_fd, flags));
@@ -90,7 +92,9 @@ __strong_alias(open64, open);
 
 int __open_2(const char* pathname, int flags) {
   if (needs_mode(flags)) __fortify_fatal("open: called with O_CREAT/O_TMPFILE but no mode");
-  int filtered_fd = custom_rom_hide_filter_proc(pathname);
+  int filtered_fd = custom_rom_hide_filter_selinux_enforce_at(AT_FDCWD, pathname, flags);
+  if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("open", finish_filtered(filtered_fd, flags));
+  filtered_fd = custom_rom_hide_filter_proc(pathname);
   if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("open", finish_filtered(filtered_fd, flags));
   filtered_fd = custom_rom_hide_filter_vintf(pathname);
   if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("open", finish_filtered(filtered_fd, flags));
@@ -113,8 +117,11 @@ int openat(int fd, const char *pathname, int flags, ...) {
     va_end(args);
   }
 
+  int filtered_fd = custom_rom_hide_filter_selinux_enforce_at(fd, pathname, flags);
+  if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("openat", finish_filtered(filtered_fd, flags));
+
   if (fd == AT_FDCWD && pathname && pathname[0] == '/') {
-    int filtered_fd = custom_rom_hide_filter_proc(pathname);
+    filtered_fd = custom_rom_hide_filter_proc(pathname);
     if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("openat", finish_filtered(filtered_fd, flags));
     filtered_fd = custom_rom_hide_filter_vintf(pathname);
     if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("openat", finish_filtered(filtered_fd, flags));
@@ -133,8 +140,10 @@ __strong_alias(openat64, openat);
 
 int __openat_2(int fd, const char* pathname, int flags) {
   if (needs_mode(flags)) __fortify_fatal("open: called with O_CREAT/O_TMPFILE but no mode");
+  int filtered_fd = custom_rom_hide_filter_selinux_enforce_at(fd, pathname, flags);
+  if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("openat", finish_filtered(filtered_fd, flags));
   if (fd == AT_FDCWD && pathname && pathname[0] == '/') {
-    int filtered_fd = custom_rom_hide_filter_proc(pathname);
+    filtered_fd = custom_rom_hide_filter_proc(pathname);
     if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("openat", finish_filtered(filtered_fd, flags));
     filtered_fd = custom_rom_hide_filter_vintf(pathname);
     if (filtered_fd >= 0) return FDTRACK_CREATE_NAME("openat", finish_filtered(filtered_fd, flags));

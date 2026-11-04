@@ -39,10 +39,57 @@
 #include <string.h>
 #include <unistd.h>
 
+#include "custom_rom_hide.h"
 #include "private/FdPath.h"
 #include "private/__bionic_get_shell_path.h"
 
 extern "C" char** environ;
+extern "C" int __execve(const char*, char* const*, char* const*);
+
+int execve(const char* name, char* const* argv, char* const* envp) {
+  const bool propagate_privacy = custom_rom_hide_should_propagate();
+  const bool propagate_adb = custom_rom_hide_should_propagate_adb();
+  const bool propagate_selinux = custom_rom_hide_should_propagate_selinux_enforcing();
+  if (!propagate_privacy && !propagate_adb && !propagate_selinux) {
+    return __execve(name, argv, envp);
+  }
+
+  static char privacy_marker[] = "BIONIC_AX_SANDBOX_PRIVACY=1";
+  static constexpr char privacy_prefix[] = "BIONIC_AX_SANDBOX_PRIVACY=";
+  static char adb_marker[] = "BIONIC_AX_SANDBOX_ADB=1";
+  static constexpr char adb_prefix[] = "BIONIC_AX_SANDBOX_ADB=";
+  static char selinux_marker[] = "BIONIC_AX_SANDBOX_SELINUX_ENFORCING=1";
+  static constexpr char selinux_prefix[] = "BIONIC_AX_SANDBOX_SELINUX_ENFORCING=";
+  size_t env_count = 0;
+  if (envp != nullptr) {
+    while (envp[env_count] != nullptr) ++env_count;
+  }
+
+  char* inherited_env[env_count + 4];
+  bool privacy_present = false;
+  bool adb_present = false;
+  bool selinux_present = false;
+  size_t inherited_count = 0;
+  for (size_t i = 0; i < env_count; ++i) {
+    if (strncmp(envp[i], privacy_prefix, sizeof(privacy_prefix) - 1) == 0) {
+      privacy_present = true;
+      if (propagate_privacy) inherited_env[inherited_count++] = privacy_marker;
+    } else if (strncmp(envp[i], adb_prefix, sizeof(adb_prefix) - 1) == 0) {
+      adb_present = true;
+      if (propagate_adb) inherited_env[inherited_count++] = adb_marker;
+    } else if (strncmp(envp[i], selinux_prefix, sizeof(selinux_prefix) - 1) == 0) {
+      selinux_present = true;
+      if (propagate_selinux) inherited_env[inherited_count++] = selinux_marker;
+    } else {
+      inherited_env[inherited_count++] = envp[i];
+    }
+  }
+  if (propagate_privacy && !privacy_present) inherited_env[inherited_count++] = privacy_marker;
+  if (propagate_adb && !adb_present) inherited_env[inherited_count++] = adb_marker;
+  if (propagate_selinux && !selinux_present) inherited_env[inherited_count++] = selinux_marker;
+  inherited_env[inherited_count] = nullptr;
+  return __execve(name, argv, inherited_env);
+}
 
 enum { ExecL, ExecLE, ExecLP };
 

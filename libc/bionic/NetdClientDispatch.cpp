@@ -16,8 +16,14 @@
 
 #include "private/NetdClientDispatch.h"
 
+#include <errno.h>
+#include <stddef.h>
 #include <sys/socket.h>
+#include <sys/un.h>
 
+#include <string.h>
+
+#include "custom_rom_hide.h"
 #include "private/bionic_fdtrack.h"
 
 extern "C" int __accept4(int, sockaddr*, socklen_t*, int);
@@ -33,6 +39,21 @@ static unsigned fallBackNetIdForResolv(unsigned netId) {
 
 static int fallBackDnsOpenProxy() {
     return -1;
+}
+
+static bool is_jdwp_control_address(const sockaddr* addr, socklen_t addr_length) {
+    static constexpr char kJdwpControlName[] = "jdwp-control";
+    constexpr size_t kAbstractNameLength = sizeof(kJdwpControlName) - 1;
+    const size_t path_offset = offsetof(sockaddr_un, sun_path);
+    const size_t expected_length = path_offset + 1 + kAbstractNameLength;
+    if (addr == nullptr || addr_length != expected_length ||
+        addr->sa_family != AF_UNIX) {
+        return false;
+    }
+
+    const auto* unix_addr = reinterpret_cast<const sockaddr_un*>(addr);
+    return unix_addr->sun_path[0] == '\0' &&
+            memcmp(unix_addr->sun_path + 1, kJdwpControlName, kAbstractNameLength) == 0;
 }
 
 // This structure is modified only at startup (when libc.so is loaded) and never
@@ -53,6 +74,15 @@ int accept4(int fd, sockaddr* addr, socklen_t* addr_length, int flags) {
 }
 
 int connect(int fd, const sockaddr* addr, socklen_t addr_length) {
+    // Refuse only the abstract JDWP control endpoint for processes carrying the
+    // per-process AxSandbox ADB policy. Socket creation and unrelated Unix/TCP
+    // connections remain untouched; raw-syscall clients are handled by adbd's
+    // authenticated peer gate.
+    if (custom_rom_hide_is_adb_enabled() && custom_rom_hide_is_app_process() &&
+        is_jdwp_control_address(addr, addr_length)) {
+        errno = ECONNREFUSED;
+        return -1;
+    }
     return __netdClientDispatch.connect(fd, addr, addr_length);
 }
 
