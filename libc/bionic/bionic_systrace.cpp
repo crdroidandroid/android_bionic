@@ -77,11 +77,10 @@ void bionic_trace_begin(const char* message) {
   // bionic_trace_begin(). Prevent infinite recursion and non-recursive mutex
   // deadlock by using a flag in the thread local storage.
   bionic_tls& tls = __get_bionic_tls();
-  if (!tls.bionic_systrace_enabled || !should_trace()) return;
-
+  if (!tls.bionic_systrace_enabled) return;
   tls.bionic_systrace_enabled = false;
 
-  trace_begin_internal(message);
+  if (should_trace()) trace_begin_internal(message);
 
   tls.bionic_systrace_enabled = true;
 }
@@ -114,11 +113,10 @@ void bionic_trace_end() {
   // bionic_trace_begin(). Prevent infinite recursion and non-recursive mutex
   // deadlock by using a flag in the thread local storage.
   bionic_tls& tls = __get_bionic_tls();
-  if (!tls.bionic_systrace_enabled || !should_trace()) return;
-
+  if (!tls.bionic_systrace_enabled) return;
   tls.bionic_systrace_enabled = false;
 
-  trace_end_internal();
+  if (should_trace()) trace_end_internal();
 
   tls.bionic_systrace_enabled = true;
 }
@@ -127,11 +125,13 @@ ScopedTrace::ScopedTrace(const char* message) : called_end_(false) {
   // Do not call should_trace if tracing is disabled, the call can crash if
   // done during initialization.
   bionic_tls& tls = __get_bionic_tls();
-  should_trace_ = tls.bionic_systrace_enabled && should_trace();
-  if (!should_trace_) return;
-
+  if (!tls.bionic_systrace_enabled) {
+    should_trace_ = false;
+    return;
+  }
   tls.bionic_systrace_enabled = false;
-  trace_begin_internal(message);
+  should_trace_ = should_trace();
+  if (should_trace_) trace_begin_internal(message);
   tls.bionic_systrace_enabled = true;
 }
 
