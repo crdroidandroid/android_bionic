@@ -32,6 +32,7 @@
 #include <sys/statfs.h>
 #include <sys/syscall.h>
 #include <sys/sysmacros.h>
+#include <sys/uio.h>
 #include <unistd.h>
 #include <private/android_filesystem_config.h>
 #include <private/bionic_lock.h>
@@ -479,11 +480,53 @@ static bool resolve_fd_path(int fd, char* buf, size_t size) {
     return false;
 }
 
+static ssize_t safe_copy_string(const char* addr, char* buf, size_t size) {
+    if (!addr || size == 0) return -1;
+
+    int saved_errno = errno;
+    ssize_t result = -1;
+
+    size_t page = static_cast<size_t>(getpagesize());
+    if (page == 0) page = 4096;
+
+    size_t len = 0;
+    const size_t max = size - 1;
+
+    while (len < max) {
+        uintptr_t cur = reinterpret_cast<uintptr_t>(addr) + len;
+        size_t chunk = page - (cur % page);
+        if (chunk > max - len) chunk = max - len;
+
+        struct iovec local = { buf + len, chunk };
+        struct iovec remote = {
+            reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(addr) + len), chunk };
+        ssize_t n = syscall(__NR_process_vm_readv, getpid(), &local, 1, &remote, 1, 0);
+        if (n < 0) goto out;
+
+        char* nul = static_cast<char*>(memchr(buf + len, '\0', static_cast<size_t>(n)));
+        if (nul) {
+            result = static_cast<ssize_t>(nul - buf);
+            goto out;
+        }
+
+        len += static_cast<size_t>(n);
+        if (static_cast<size_t>(n) < chunk) {
+            goto out;
+        }
+    }
+out:
+    errno = saved_errno;
+    return result;
+}
+
 bool custom_rom_hide_should_block(const char* path) {
     if (!path || reinterpret_cast<uintptr_t>(path) < 0x1000000) return false;
-    if (path[0] != '/') return false;
     if (!is_app_process()) return false;
-    return is_rom_path(path);
+
+    char local[512];
+    if (safe_copy_string(path, local, sizeof(local)) < 0) return false;
+    if (local[0] != '/') return false;
+    return is_rom_path(local);
 }
 
 bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
@@ -493,13 +536,19 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
     int saved_errno = errno;
     bool result = false;
 
-    if (path[0] == '/') {
-        result = is_rom_path(path);
+    char local[512];
+    if (safe_copy_string(path, local, sizeof(local)) < 0) {
+        errno = saved_errno;
+        return false;
+    }
+
+    if (local[0] == '/') {
+        result = is_rom_path(local);
     } else if (dirfd != AT_FDCWD) {
-        size_t plen = strlen(path);
-        bool candidate = plen > 0 && path[plen - 1] == '/';
+        size_t plen = strlen(local);
+        bool candidate = plen > 0 && local[plen - 1] == '/';
         if (!candidate) {
-            const char* base = path_basename(path);
+            const char* base = path_basename(local);
             for (const char* const* dn = kBlockedDirnames; *dn; ++dn) {
                 if (strcmp(base, *dn) == 0) { candidate = true; break; }
             }
@@ -508,8 +557,8 @@ bool custom_rom_hide_should_block_at(int dirfd, const char* path) {
         if (candidate) {
             char dir_path[256];
             if (resolve_fd_path(dirfd, dir_path, sizeof(dir_path))) {
-                char full_path[512];
-                int n = snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, path);
+                char full_path[512 + 256 + 1];
+                int n = snprintf(full_path, sizeof(full_path), "%s/%s", dir_path, local);
                 if (n > 0 && static_cast<size_t>(n) < sizeof(full_path)) {
                     result = is_rom_path(full_path);
                 }
