@@ -71,7 +71,7 @@ int fstatat(int dirfd, const char* path, struct stat* sb, int flags) {
   }
   int res = raw_fstatat(dirfd, path, sb, flags);
   if (res == 0) {
-    if ((flags & AT_EMPTY_PATH) && (path == nullptr || path[0] == '\0')) {
+    if ((flags & AT_EMPTY_PATH) && custom_rom_hide_is_empty_path(path)) {
       custom_rom_hide_spoof_fd_stat(dirfd, sb);
     } else {
       custom_rom_hide_spoof_stat(path, sb);
@@ -101,7 +101,7 @@ int statx(int dirfd, const char* path, int flags, unsigned mask, struct statx* b
   }
   int res = __statx(dirfd, path, flags, mask, buf);
   if (res == 0) {
-    if ((flags & AT_EMPTY_PATH) && (path == nullptr || path[0] == '\0')) {
+    if ((flags & AT_EMPTY_PATH) && custom_rom_hide_is_empty_path(path)) {
       custom_rom_hide_spoof_fd_statx(dirfd, mask, buf);
     } else {
       custom_rom_hide_spoof_statx(path, buf);
