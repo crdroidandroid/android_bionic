@@ -578,6 +578,12 @@ bool custom_rom_hide_is_symlink(const char* path) {
     return result;
 }
 
+bool custom_rom_hide_is_empty_path(const char* path) {
+    if (!path) return true;
+    char local[2];
+    return safe_copy_string(path, local, sizeof(local)) == 0;
+}
+
 bool custom_rom_hide_should_filter_dirent(int dirfd, const char* name) {
     if (!name || reinterpret_cast<uintptr_t>(name) < 0x1000000) return false;
     if (!is_app_process()) return false;
@@ -1176,8 +1182,10 @@ bool custom_rom_hide_is_app_process() {
 
 static const PartitionDevEntry* find_partition_entry(const char* path) {
     if (!path) return nullptr;
+    char local[32];
+    if (safe_copy_string(path, local, sizeof(local)) < 0) return nullptr;
     for (const PartitionDevEntry* e = kPartitionDmMap; e->path; ++e) {
-        if (strcmp(path, e->path) == 0) return e;
+        if (strcmp(local, e->path) == 0) return e;
     }
     return nullptr;
 }
