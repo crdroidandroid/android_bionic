@@ -736,7 +736,7 @@ ssize_t custom_rom_hide_readlinkat_post(int dirfd, const char* path, char* buf,
 }
 
 enum ProcFilterType {
-    PROC_FILTER_NONE, PROC_FILTER_MAPS, PROC_FILTER_MOUNTS,
+    PROC_FILTER_NONE, PROC_FILTER_MAPS, PROC_FILTER_SMAPS, PROC_FILTER_MOUNTS,
     PROC_FILTER_MOUNTINFO, PROC_FILTER_FILESYSTEMS, PROC_FILTER_CMDLINE,
 };
 
@@ -761,7 +761,8 @@ static ProcFilterType get_proc_filter_type(const char* path) {
     const char* leaf_base = strrchr(leaf, '/');
     leaf_base = leaf_base ? leaf_base + 1 : leaf;
 
-    if (strcmp(leaf_base, "maps") == 0 || strcmp(leaf_base, "smaps") == 0) return PROC_FILTER_MAPS;
+    if (strcmp(leaf_base, "maps") == 0) return PROC_FILTER_MAPS;
+    if (strcmp(leaf_base, "smaps") == 0) return PROC_FILTER_SMAPS;
     if (strcmp(leaf_base, "mounts") == 0) return PROC_FILTER_MOUNTS;
     if (strcmp(leaf_base, "mountinfo") == 0) return PROC_FILTER_MOUNTINFO;
 
@@ -985,6 +986,24 @@ static bool drop_proc_line(const char* line, void* ctx) {
     return should_filter_line(*static_cast<ProcFilterType*>(ctx), line);
 }
 
+static bool is_smaps_header(const char* line) {
+    if (line[0] == '\0') return false;
+    return (line[0] >= '0' && line[0] <= '9') || (line[0] >= 'a' && line[0] <= 'f');
+}
+
+struct SmapsFilterCtx {
+    bool dropping;
+};
+
+static bool drop_smaps_line(const char* line, void* raw_ctx) {
+    SmapsFilterCtx* ctx = static_cast<SmapsFilterCtx*>(raw_ctx);
+    if (is_smaps_header(line)) {
+        ctx->dropping = line_has_blocked_segment(line);
+        return ctx->dropping;
+    }
+    return ctx->dropping;
+}
+
 int custom_rom_hide_filter_proc(const char* path) {
     if (!is_app_process()) return -1;
     if (!path || reinterpret_cast<uintptr_t>(path) < 0x1000000) return -1;
@@ -992,6 +1011,13 @@ int custom_rom_hide_filter_proc(const char* path) {
     int saved_errno = errno;
     ProcFilterType type = get_proc_filter_type(path);
     if (type == PROC_FILTER_NONE) { errno = saved_errno; return -1; }
+
+    if (type == PROC_FILTER_SMAPS) {
+        SmapsFilterCtx ctx = {};
+        int mem_fd = filter_file_with(path, drop_smaps_line, write_line_raw, &ctx);
+        errno = saved_errno;
+        return mem_fd;
+    }
 
     if (type != PROC_FILTER_CMDLINE) {
         LineWriter writer = (type == PROC_FILTER_MOUNTS || type == PROC_FILTER_MOUNTINFO)
