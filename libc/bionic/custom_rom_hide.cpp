@@ -486,35 +486,16 @@ static ssize_t safe_copy_string(const char* addr, char* buf, size_t size) {
     int saved_errno = errno;
     ssize_t result = -1;
 
-    size_t page = static_cast<size_t>(getpagesize());
-    if (page == 0) page = 4096;
-
-    size_t len = 0;
     const size_t max = size - 1;
-
-    while (len < max) {
-        uintptr_t cur = reinterpret_cast<uintptr_t>(addr) + len;
-        size_t chunk = page - (cur % page);
-        if (chunk > max - len) chunk = max - len;
-
-        struct iovec local = { buf + len, chunk };
-        struct iovec remote = {
-            reinterpret_cast<void*>(reinterpret_cast<uintptr_t>(addr) + len), chunk };
-        ssize_t n = syscall(__NR_process_vm_readv, getpid(), &local, 1, &remote, 1, 0);
-        if (n < 0) goto out;
-
-        char* nul = static_cast<char*>(memchr(buf + len, '\0', static_cast<size_t>(n)));
-        if (nul) {
-            result = static_cast<ssize_t>(nul - buf);
-            goto out;
-        }
-
-        len += static_cast<size_t>(n);
-        if (static_cast<size_t>(n) < chunk) {
-            goto out;
-        }
+    struct iovec local = { buf, max };
+    struct iovec remote = {
+        reinterpret_cast<void*>(const_cast<char*>(addr)), max };
+    ssize_t n = syscall(__NR_process_vm_readv, getpid(), &local, 1, &remote, 1, 0);
+    if (n > 0) {
+        char* nul = static_cast<char*>(memchr(buf, '\0', static_cast<size_t>(n)));
+        if (nul) result = static_cast<ssize_t>(nul - buf);
     }
-out:
+
     errno = saved_errno;
     return result;
 }
@@ -1239,10 +1220,8 @@ bool custom_rom_hide_is_app_process() {
 
 static const PartitionDevEntry* find_partition_entry(const char* path) {
     if (!path) return nullptr;
-    char local[32];
-    if (safe_copy_string(path, local, sizeof(local)) < 0) return nullptr;
     for (const PartitionDevEntry* e = kPartitionDmMap; e->path; ++e) {
-        if (strcmp(local, e->path) == 0) return e;
+        if (strcmp(path, e->path) == 0) return e;
     }
     return nullptr;
 }
