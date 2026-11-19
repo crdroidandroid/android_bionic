@@ -991,17 +991,48 @@ static bool is_smaps_header(const char* line) {
     return (line[0] >= '0' && line[0] <= '9') || (line[0] >= 'a' && line[0] <= 'f');
 }
 
+static bool is_webview_apk_path(const char* line) {
+    return strstr(line, "webview.apk") != nullptr;
+}
+
 struct SmapsFilterCtx {
     bool dropping;
+    bool sanitizing;
 };
 
 static bool drop_smaps_line(const char* line, void* raw_ctx) {
     SmapsFilterCtx* ctx = static_cast<SmapsFilterCtx*>(raw_ctx);
     if (is_smaps_header(line)) {
         ctx->dropping = line_has_blocked_segment(line);
+        ctx->sanitizing = !ctx->dropping && is_webview_apk_path(line);
         return ctx->dropping;
     }
     return ctx->dropping;
+}
+
+static void sanitize_smaps_field(char* line) {
+    static const char* const kFields[] = {
+        "Shared_Dirty:", "Anonymous:", "Swap:",
+        "Pss_Dirty:", "Pss_Anon:", "SwapPss:",
+        nullptr
+    };
+    for (const char* const* f = kFields; *f; ++f) {
+        size_t flen = strlen(*f);
+        if (strncmp(line, *f, flen) != 0) continue;
+        char* p = line + flen;
+        while (*p == ' ' || *p == '\t') p++;
+        if (*p >= '0' && *p <= '9') {
+            *p++ = '0';
+            while (*p >= '0' && *p <= '9') *p++ = ' ';
+        }
+        return;
+    }
+}
+
+static bool write_sanitized_smaps_line(int fd, char* line, size_t len, void* raw_ctx) {
+    SmapsFilterCtx* ctx = static_cast<SmapsFilterCtx*>(raw_ctx);
+    if (ctx->sanitizing) sanitize_smaps_field(line);
+    return raw_write_all(fd, line, len);
 }
 
 int custom_rom_hide_filter_proc(const char* path) {
@@ -1014,7 +1045,7 @@ int custom_rom_hide_filter_proc(const char* path) {
 
     if (type == PROC_FILTER_SMAPS) {
         SmapsFilterCtx ctx = {};
-        int mem_fd = filter_file_with(path, drop_smaps_line, write_line_raw, &ctx);
+        int mem_fd = filter_file_with(path, drop_smaps_line, write_sanitized_smaps_line, &ctx);
         errno = saved_errno;
         return mem_fd;
     }
